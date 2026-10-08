@@ -13,13 +13,23 @@ async function bootstrap() {
 
   // CORS Configuration
   const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
+    ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+    : [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://frontend-cyan-nu-86.vercel.app',
+      ];
 
   app.enableCors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps, curl, server-to-server) or localhost in dev
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith('http://localhost:') ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('vercel.app')
+      ) {
         callback(null, true);
       } else if (process.env.NODE_ENV !== 'production') {
         callback(null, true);
@@ -46,7 +56,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
   logger.log(`⚡ KUROPUNK // VANDAL STITCH API running on: http://localhost:${port}/api`);
   const dbType = process.env.DB_TYPE || (process.env.DATABASE_URL ? 'postgres' : 'sqlite');
