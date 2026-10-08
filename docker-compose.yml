@@ -1,0 +1,50 @@
+services:
+  # ========================================================
+  # Base de Datos PostgreSQL
+  # ========================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: kuropunk-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crochet_admin
+      POSTGRES_PASSWORD: crochet_secure_pass
+      POSTGRES_DB: tienda_crochet
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U crochet_admin -d tienda_crochet']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ========================================================
+  # Backend NestJS (API REST + TypeORM)
+  # ========================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kuropunk-backend
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=crochet_admin
+      - DB_PASSWORD=crochet_secure_pass
+      - DB_DATABASE=tienda_crochet
+      - CORS_ORIGIN=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local

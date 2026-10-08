@@ -1,0 +1,40 @@
+# ==============================================================================
+# KUROPUNK UNDERGROUND CROCHET - DIRECTRICES Y REGLAS DE AGENTE FRONTEND (.cursorrules)
+# ==============================================================================
+
+## 1. ESTANDARIZACIÓN DE IDIOMA Y COPYWRITING (ESPAÑOL NATIVO)
+- TODO el contenido orientado al usuario final (UI copy, labels, botones, mensajes toast, modales, alertas y estados vacíos) DEBE redactarse en ESPAÑOL NEUTRO y NATURAL, alineado con la identidad de marca urbana y táctica de KuroPunk.
+- PROHIBIDAS las traducciones automáticas o literales de librerías en inglés:
+  - NUNCA traducir "Home" como "Hogar" -> Usar "Inicio".
+  - NUNCA traducir "Search" / "Bus" como "Autobús" -> Usar "Buscar piezas, SKUs...".
+  - NUNCA traducir "Shop" como "Comercio" -> Usar "Catálogo" o "Arsenal".
+  - NUNCA traducir "Checkout" como "Comprobar" -> Usar "Finalizar Pedido" o "Despacho".
+  - NUNCA dejar textos en inglés como "Submit", "Loading...", "Close", "Sign In".
+- En nombres de marca registrados o términos clave de identidad, incluir obligatoriamente el atributo `translate="no"` o `lang="es"` para prevenir que traductores del navegador rompan el diseño:
+  `<span translate="no" className="font-bold">KUROPUNK</span>`
+
+## 2. ARQUITECTURA DE COMPONENTES Y STACK TECNOLÓGICO
+- Modularidad: Mantener componentes autocontenidos, reutilizables y con una única responsabilidad.
+- Tailwind CSS: Usar clases utilitarias limpias, sin estilos inline hardcodeados a menos que sean valores dinámicos calculados (e.g. transformaciones de canvas o física).
+- Tipado y Validación: Documentar las props esperadas mediante JSDoc o interfaces TypeScript. Validar datos provenientes de APIs antes de renderizarlos.
+- Seguridad de Credenciales: ESTRICTAMENTE PROHIBIDO hardcodear API keys, contraseñas o tokens en el código frontend.
+  - Siempre usar `import.meta.env.VITE_*` (en Vite) con validación previa en los servicios correspondientes.
+  - Si una variable de entorno no está configurada, implementar guardas defensivas que no provoquen caídas en blanco (white screen of death).
+
+## 3. ACCESIBILIDAD (A11Y) Y EXPERIENCIA DE INTERACCIÓN
+- Botones e interactivos sin texto visible deben incluir `aria-label` descriptivo (ej: `aria-label="Cerrar ventana emergente"`).
+- Navegación accesible por teclado:
+  - Todo modal o diálogo emergente debe cerrarse con la tecla `Escape`.
+  - Proporcionar indicadores visibles de foco (`focus:ring-2`, `focus:outline-none`).
+  - Respetar touch targets mínimos en dispositivos táctiles (mínimo 44x44px).
+
+## 4. CONTROL DE CONTEXTO, LAYOUT Y VIEWPORT
+- Z-Index y Apilamiento:
+  - Modales y diálogos críticos: `z-50`.
+  - Backdrops y overlays de oscurecimiento: `z-40` o `z-50` junto al modal.
+  - Navbar y cabecera fija: `z-40`.
+  - Notificaciones Toasts: `z-[100]`.
+- Responsive Design y Viewport:
+  - Todo componente debe ser mobile-first y verificado para pantallas estrechas (360px a 430px) y escritorios amplios.
+  - Los modales deben incluir SIEMPRE `max-h-[90vh] overflow-y-auto` y padding perimetral para evitar que botones o formularios queden cortados fuera de la pantalla en dispositivos pequeños.
+  - Evitar a toda costa overflow horizontal involuntario en la etiqueta raíz (`overflow-x-hidden`).

@@ -1,0 +1,34 @@
+export class UpdateProductDto {
+  title?: string;
+  subtitle?: string;
+  category?: string;
+  series?: string;
+  type?: string;
+  price?: number;
+  originalPrice?: number;
+  kitPrice?: number;
+  bundlePrice?: number;
+  stock?: number;
+  isFeatured?: boolean;
+  isHero?: boolean;
+  badge?: string;
+  badgeType?: string;
+  badgeVol?: string;
+  edition?: string;
+  height?: string;
+  yarn?: string;
+  description?: string;
+  specs?: string[];
+  image?: string;
+  altImage?: string;
+  size?: string;
+  fabric?: string;
+  gridSize?: string;
+  dmcPalette?: string;
+  stitchesCount?: string;
+  hookSize?: string;
+  pages?: string;
+  stitches?: string;
+  estimatedTime?: string;
+  difficulty?: string;
+}
