@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { CartProvider, useCart } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
@@ -9,11 +9,39 @@ import { ConcreteShaderCanvas } from './components/ConcreteShaderCanvas';
 import { HomePage } from './pages/HomePage';
 import { ShopPage } from './pages/ShopPage';
 import { AdminGuard } from './guards/AdminGuard';
-import { PRODUCTS } from './data/products';
+import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from './data/products';
 import { AnimatePresence, motion } from 'framer-motion';
 import Lenis from 'lenis';
 import { Toaster } from 'sonner';
-import { Hammer } from 'lucide-react';
+
+// Catálogo unificado para resolución directa de URLs compartidas y navegación
+const ALL_CATALOG_PRODUCTS = [...PRODUCTS, ...(PUNTO_CRUZ_PRODUCTS || []), ...(PATRONES_PRODUCTS || [])];
+
+// Helper para parsear la ruta desde el Hash del navegador (soporte total de botón Atrás/Adelante)
+function parseHashRoute() {
+  if (typeof window === 'undefined') return { view: 'home', productId: null };
+  const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
+  if (!rawHash) return { view: 'home', productId: null };
+
+  const [route, param] = rawHash.split('/');
+  if (route === 'product' && param) {
+    return { view: 'product-detail', productId: decodeURIComponent(param) };
+  }
+  const validViews = ['home', 'shop', 'about', 'contact', 'checkout', 'my-orders', 'admin'];
+  if (validViews.includes(route)) {
+    return { view: route, productId: null };
+  }
+  return { view: 'home', productId: null };
+}
+
+// Helper para formatear vista y producto a Hash de navegación
+function formatHashRoute(view, product = null) {
+  if (view === 'product-detail' && product?.id) {
+    return `#/product/${encodeURIComponent(product.id)}`;
+  }
+  if (view === 'home') return '#/';
+  return `#/${view}`;
+}
 
 // Lazy-loaded heavy modules and secondary pages to minimize initial mobile bundle
 const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage').then(m => ({ default: m.ProductDetailPage })));
@@ -41,8 +69,16 @@ const PageLoadingFallback = () => (
 );
 
 export function AppContent() {
-  const [currentView, setCurrentView] = useState('home');
-  const [selectedProduct, setSelectedProduct] = useState(PRODUCTS[0]);
+  const initialRoute = parseHashRoute();
+  const [currentView, setCurrentViewState] = useState(initialRoute.view);
+  const [selectedProduct, setSelectedProduct] = useState(() => {
+    if (initialRoute.productId) {
+      const found = ALL_CATALOG_PRODUCTS.find(p => p.id === initialRoute.productId || p.sku === initialRoute.productId);
+      if (found) return found;
+    }
+    return PRODUCTS[0];
+  });
+
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -51,12 +87,64 @@ export function AppContent() {
   const { setIsCartOpen } = useCart();
   const { currentUser, isAdmin } = useAuth();
 
+  // Navegación sincronizada con el historial nativo del navegador (PushState + Hash)
+  const navigateTo = useCallback((view, product = null, replace = false) => {
+    const targetProduct = product || selectedProduct;
+    if (product) {
+      setSelectedProduct(product);
+    }
+    setCurrentViewState(view);
+
+    const targetHash = formatHashRoute(view, targetProduct);
+    if (window.location.hash !== targetHash) {
+      if (replace) {
+        window.history.replaceState({ view, productId: targetProduct?.id }, '', targetHash);
+      } else {
+        window.history.pushState({ view, productId: targetProduct?.id }, '', targetHash);
+      }
+    }
+  }, [selectedProduct]);
+
+  // Navegación Atrás inteligente: Usa el botón atrás del navegador o vuelve al home/shop
+  const navigateBack = useCallback(() => {
+    if (window.history.length > 1 && window.location.hash !== '#/' && window.location.hash !== '') {
+      window.history.back();
+    } else {
+      navigateTo('shop');
+    }
+  }, [navigateTo]);
+
+  // Listener para soportar Botón Atrás (Back), Botón Adelante (Forward) y gestos táctiles móviles
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const { view, productId } = parseHashRoute();
+      if (view === 'product-detail' && productId) {
+        const found = ALL_CATALOG_PRODUCTS.find(p => p.id === productId || p.sku === productId);
+        if (found) setSelectedProduct(found);
+      }
+      setCurrentViewState(view);
+    };
+
+    // Asegurar que la entrada inicial exista en el stack de historial
+    if (!window.location.hash || window.location.hash === '#/' || window.location.hash === '#') {
+      window.history.replaceState({ view: 'home' }, '', '#/');
+    }
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
+
   // Strict RBAC Guard: If user logs out and currentView is admin, force redirect to home
   useEffect(() => {
     if (!isAdmin && currentView === 'admin') {
-      setCurrentView('home');
+      navigateTo('home', null, true);
     }
-  }, [isAdmin, currentView]);
+  }, [isAdmin, currentView, navigateTo]);
 
   // Initialize Lenis Smooth Scrolling (solo en Desktop con puntero fino para evitar lag táctil)
   useEffect(() => {
@@ -89,8 +177,7 @@ export function AppContent() {
   }, [currentView]);
 
   const handleSelectProduct = (product) => {
-    setSelectedProduct(product);
-    setCurrentView('product-detail');
+    navigateTo('product-detail', product);
   };
 
   const pageVariants = {
@@ -107,7 +194,7 @@ export function AppContent() {
       {/* 2. Global Persistent Navigation Bar */}
       <Navbar 
         currentView={currentView} 
-        setCurrentView={setCurrentView} 
+        setCurrentView={navigateTo} 
         onOpenCommandPalette={() => setIsCommandOpen(true)}
         onOpenTracking={() => setIsTrackingOpen(true)}
         onOpenAuth={() => setIsAuthOpen(true)}
@@ -122,7 +209,7 @@ export function AppContent() {
             isOpen={isCommandOpen}
             setIsOpen={setIsCommandOpen}
             onSelectProduct={handleSelectProduct}
-            setCurrentView={setCurrentView}
+            setCurrentView={navigateTo}
             onOpenCart={() => setIsCartOpen(true)}
           />
         </Suspense>
@@ -172,8 +259,8 @@ export function AppContent() {
 
       {/* 4. Slide-over Cart Drawer */}
       <CartDrawer
-        onCheckout={() => setCurrentView('checkout')}
-        onExploreCatalog={() => setCurrentView('shop')}
+        onCheckout={() => navigateTo('checkout')}
+        onExploreCatalog={() => navigateTo('shop')}
       />
 
       {/* 5. Industrial Floating Toast Alerts & Sonner Notifications */}
@@ -187,7 +274,7 @@ export function AppContent() {
             {currentView === 'home' && (
               <motion.div key="home" variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 <HomePage
-                  setCurrentView={setCurrentView}
+                  setCurrentView={navigateTo}
                   onSelectProduct={handleSelectProduct}
                 />
               </motion.div>
@@ -206,7 +293,7 @@ export function AppContent() {
                 <ProductDetailPage
                   product={selectedProduct}
                   onSelectProduct={handleSelectProduct}
-                  onBackToShop={() => setCurrentView('shop')}
+                  onBackToShop={navigateBack}
                 />
               </motion.div>
             )}
@@ -214,7 +301,7 @@ export function AppContent() {
             {currentView === 'about' && (
               <motion.div key="about" variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 <OurStoryPage
-                  setCurrentView={setCurrentView}
+                  setCurrentView={navigateTo}
                 />
               </motion.div>
             )}
@@ -228,7 +315,7 @@ export function AppContent() {
             {currentView === 'checkout' && (
               <motion.div key="checkout" variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 <CheckoutPage
-                  onBackToShop={() => setCurrentView('shop')}
+                  onBackToShop={navigateBack}
                   onOpenTracking={() => setIsTrackingOpen(true)}
                 />
               </motion.div>
@@ -237,7 +324,7 @@ export function AppContent() {
             {currentView === 'my-orders' && (
               <motion.div key="my-orders" variants={pageVariants} initial="initial" animate="animate" exit="exit">
                 <MyOrdersPage
-                  onBackToShop={() => setCurrentView('shop')}
+                  onBackToShop={navigateBack}
                   onSelectOrderForTracking={() => setIsTrackingOpen(true)}
                 />
               </motion.div>
@@ -245,8 +332,8 @@ export function AppContent() {
 
             {currentView === 'admin' && (
               <motion.div key="admin" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <AdminGuard onBackToShop={() => setCurrentView('shop')}>
-                  <AdminPage onBackToShop={() => setCurrentView('shop')} />
+                <AdminGuard onBackToShop={navigateBack}>
+                  <AdminPage onBackToShop={navigateBack} />
                 </AdminGuard>
               </motion.div>
             )}
@@ -255,7 +342,7 @@ export function AppContent() {
       </main>
 
       {/* 7. Global Footer */}
-      <Footer setCurrentView={setCurrentView} />
+      <Footer setCurrentView={navigateTo} />
     </div>
   );
 }
