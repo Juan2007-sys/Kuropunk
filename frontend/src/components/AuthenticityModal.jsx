@@ -22,7 +22,7 @@ const CERTIFICATE_VAULT = {
     series: 'Grit Series Vol. 04',
     edition: '042 de 050',
     craftDate: '15 de Agosto, 2026',
-    artisan: 'Mateo R. & Colectivo KuroPunk Medellín',
+    artisan: 'Mateo R. & Colectivo KuroPunk Bogotá',
     yarnSpec: 'Acrílico Industrial de Alta Torsión 100%',
     status: 'VERIFICADO // ACTIVO EN BÓVEDA',
     ownerAlias: 'Operativo Coleccionista #42',
@@ -81,7 +81,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
           series: 'Lote Personalizado KuroPunk',
           edition: 'Pieza Única 1 de 1',
           craftDate: 'Septiembre 2026',
-          artisan: 'Artesano Certificado KuroPunk Medellín',
+          artisan: 'Artesano Certificado KuroPunk Bogotá',
           yarnSpec: 'Fibras Seleccionadas de Grado Industrial',
           status: 'VERIFICADO // PIEZA AUTÉNTICA',
           ownerAlias: 'Comprador Certificado',
@@ -236,7 +236,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
                 <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[10px] font-mono text-neutral-500">
                     <Award className="w-4 h-4 text-[#e0141f]" />
-                    <span>EMITIDO POR KUROPUNK COLLECTIVE // MEDELLÍN</span>
+                    <span>EMITIDO POR KUROPUNK COLLECTIVE // BOGOTÁ</span>
                   </div>
 
                   <button

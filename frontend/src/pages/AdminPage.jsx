@@ -2,14 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   subscribeAllOrders,
+  subscribeContactMessages,
   updateOrderStatusInFirestore,
+  verifyOrderDepositInFirestore,
   saveProductInFirestore,
   deleteProductInFirestore,
   uploadProductImage,
   subscribeProducts,
   syncCatalogToFirestore
 } from '../services/firebase';
-import { formatCOP } from '../utils/formatters';
+import { formatCOP, generateAdminToCustomerWhatsAppUrl } from '../utils/formatters';
+import { getContactMessages, getAllOrders, verifyOrderDeposit } from '../services/api';
 import { PRODUCTS as fallbackCatalog, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 import {
   Package,
@@ -29,13 +32,19 @@ import {
   Eye,
   MessageSquare,
   X,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck,
+  CreditCard,
+  XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 const ORDER_STATUS_OPTIONS = [
-  { value: 'placed', label: '1. Creado / Placed', color: 'text-amber-400' },
+  { value: 'ESPERANDO_PAGO', label: '0A. Esperando Anticipo (20%)', color: 'text-amber-400' },
+  { value: 'VERIFICANDO_ANTICIPO', label: '0B. Verificando Anticipo', color: 'text-yellow-400' },
+  { value: 'EN_COLA', label: '1. En Cola Oficial (Anticipo OK)', color: 'text-emerald-400' },
+  { value: 'placed', label: '1B. Creado / Placed', color: 'text-amber-400' },
   { value: 'confirmed', label: '2. Confirmado', color: 'text-blue-400' },
   { value: 'in_production', label: '3. En Producción (Taller)', color: 'text-purple-400' },
   { value: 'shipped', label: '4. Enviado (En Ruta)', color: 'text-emerald-400' },
@@ -63,7 +72,8 @@ function playRadarChime() {
 
 export function AdminPage({ onBackToShop }) {
   const { currentUser, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'products'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'products' | 'commissions'
+  const [contactMessages, setContactMessages] = useState([]);
 
   // Confirmation Modal State (replaces native window.confirm to eliminate "localhost dice")
   const [confirmConfig, setConfirmConfig] = useState({
@@ -85,6 +95,7 @@ export function AdminPage({ onBackToShop }) {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
   const [selectedOrderDetail, setSelectedOrderDetail] = useState(null);
+  const [orderQueueFilter, setOrderQueueFilter] = useState('split'); // 'split' | 'pre_queue' | 'official_queue'
   const prevOrderCountRef = React.useRef(0);
 
   // Products State
@@ -108,7 +119,7 @@ export function AdminPage({ onBackToShop }) {
   const [formImages, setFormImages] = useState([]);
   const [formIsActive, setFormIsActive] = useState(true);
 
-  // Real-time Orders Subscription
+  // Real-time Orders Subscription + Backend Sync
   useEffect(() => {
     const defaultOrders = [
       {
@@ -116,14 +127,39 @@ export function AdminPage({ onBackToShop }) {
         customerData: {
           name: 'Santiago Vélez (QA)',
           phone: '+573015690382',
-          shippingAddress: 'Calle 10 # 43E - 22, El Poblado (Medellín)'
+          shippingAddress: 'Carrera 7 # 72 - 41, Chapinero (Bogotá)'
         },
         items: [{ title: 'Jungkook con Pijama de Cooky', quantity: 1, unitPrice: 50000 }],
         totalAmount: 50000,
-        status: 'confirmed',
+        total: 50000,
+        requiresDeposit: false,
+        depositBaseAmount: 0,
+        depositRequiredAmount: 0,
+        remainingBalance: 50000,
+        paymentStatus: 'NO_REQUIERE',
+        status: 'EN_COLA',
+        queuedAt: '2026-11-09T10:00:00.000Z',
         trackingNumber: 'KURO-TRK-77X'
       }
     ];
+
+    const mergeOrdersLists = (listA = [], listB = []) => {
+      const map = new Map();
+      for (const item of [...listA, ...listB]) {
+        if (!item || !item.id) continue;
+        map.set(String(item.id), { ...(map.get(String(item.id)) || {}), ...item });
+      }
+      return Array.from(map.values());
+    };
+
+    getAllOrders()
+      .then((backendOrders) => {
+        if (Array.isArray(backendOrders) && backendOrders.length > 0) {
+          setOrders((prev) => mergeOrdersLists(backendOrders, prev));
+          setLoadingOrders(false);
+        }
+      })
+      .catch(() => {});
 
     const timer = setTimeout(() => {
       setOrders((prev) => (prev.length > 0 ? prev : defaultOrders));
@@ -141,14 +177,14 @@ export function AdminPage({ onBackToShop }) {
             });
           }
           prevOrderCountRef.current = liveOrders.length;
-          setOrders(liveOrders);
+          setOrders((prev) => mergeOrdersLists(liveOrders, prev));
         } else {
-          setOrders(defaultOrders);
+          setOrders((prev) => (prev.length > 0 ? prev : defaultOrders));
         }
         setLoadingOrders(false);
       },
       () => {
-        setOrders(defaultOrders);
+        setOrders((prev) => (prev.length > 0 ? prev : defaultOrders));
         setLoadingOrders(false);
       }
     );
@@ -157,6 +193,39 @@ export function AdminPage({ onBackToShop }) {
       clearTimeout(timer);
       unsubscribe();
     };
+  }, []);
+
+  // Real-time Contact Messages & Commissions Subscription
+  useEffect(() => {
+    // 1. Fetch from backend as complement
+    getContactMessages()
+      .then((backendMsgs) => {
+        if (Array.isArray(backendMsgs) && backendMsgs.length > 0) {
+          setContactMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => String(m.id)));
+            const newOnes = backendMsgs.filter((bm) => !existingIds.has(String(bm.id)));
+            return [...prev, ...newOnes];
+          });
+        }
+      })
+      .catch(() => {});
+
+    // 2. Real-time Firestore + LocalStorage subscription
+    const unsubscribe = subscribeContactMessages(
+      (liveMsgs) => {
+        if (liveMsgs) {
+          setContactMessages((prev) => {
+            const liveIds = new Set(liveMsgs.map((m) => String(m.id)));
+            const leftovers = prev.filter((p) => !liveIds.has(String(p.id)));
+            return [...liveMsgs, ...leftovers];
+          });
+        }
+      },
+      (err) => {
+        console.warn('[AdminPage] Contact messages subscription fallback:', err);
+      }
+    );
+    return () => unsubscribe();
   }, []);
 
   // Real-time Products Subscription from Firestore
@@ -259,6 +328,77 @@ export function AdminPage({ onBackToShop }) {
       setUpdatingOrderId(null);
     }
   };
+
+  // Handle Admin Deposit Verification (Confirm -> EN_COLA + queuedAt, Reject -> ESPERANDO_PAGO + RECHAZADO)
+  const handleVerifyDeposit = async (orderId, action) => {
+    const act = String(action || '').toUpperCase();
+    setUpdatingOrderId(orderId);
+    try {
+      const updatedFromBackend = await verifyOrderDeposit(orderId, { action: act });
+      await verifyOrderDepositInFirestore(orderId, act);
+
+      const nowIso = updatedFromBackend?.queuedAt || new Date().toISOString();
+      const nextStatus = act === 'CONFIRM' ? 'EN_COLA' : 'ESPERANDO_PAGO';
+      const nextPaymentStatus = act === 'CONFIRM' ? 'ANTICIPO_VERIFICADO' : 'RECHAZADO';
+
+      setOrders((prev) =>
+        prev.map((o) =>
+          String(o.id) === String(orderId)
+            ? {
+                ...o,
+                status: nextStatus,
+                paymentStatus: nextPaymentStatus,
+                queuedAt: act === 'CONFIRM' ? nowIso : null
+              }
+            : o
+        )
+      );
+
+      if (selectedOrderDetail && String(selectedOrderDetail.id) === String(orderId)) {
+        setSelectedOrderDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: nextStatus,
+                paymentStatus: nextPaymentStatus,
+                queuedAt: act === 'CONFIRM' ? nowIso : null
+              }
+            : null
+        );
+      }
+
+      if (act === 'CONFIRM') {
+        playRadarChime();
+        toast.success(`¡Anticipo del 20% confirmado! Orden #${orderId} enviada a la Cola de Producción Oficial.`);
+      } else {
+        toast.warning(`Anticipo rechazado para la orden #${orderId}. Se notificó que el pago no fue recibido.`);
+      }
+    } catch (err) {
+      toast.error('Error al verificar anticipo: ' + (err.message || 'Intenta de nuevo'));
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  // Separación estricta Pre-Cola vs Cola de Producción Oficial
+  const isPreQueueStatus = (st) => {
+    const u = String(st || '').toUpperCase();
+    return u === 'ESPERANDO_PAGO' || u === 'VERIFICANDO_ANTICIPO';
+  };
+
+  const preQueueOrders = orders.filter((o) => isPreQueueStatus(o.status));
+  const officialQueueOrders = orders
+    .filter((o) => !isPreQueueStatus(o.status))
+    .slice()
+    .sort((a, b) => {
+      const hasQueueA = Boolean(a.queuedAt);
+      const hasQueueB = Boolean(b.queuedAt);
+      if (hasQueueA && !hasQueueB) return -1;
+      if (!hasQueueA && hasQueueB) return 1;
+      const timeA = new Date(a.queuedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.queuedAt || b.createdAt || 0).getTime();
+      return (isNaN(timeA) ? 0 : timeA) - (isNaN(timeB) ? 0 : timeB);
+    });
 
   // Handle Product Image Upload to Firebase Storage
   const handleImageUpload = async (e) => {
@@ -494,7 +634,7 @@ export function AdminPage({ onBackToShop }) {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
         <button
           onClick={() => setActiveTab('orders')}
           className={`py-3 sm:py-3.5 px-4 sm:px-6 font-headline-md text-base sm:text-xl uppercase tracking-wider border-2 transition-all flex items-center justify-center space-x-3 min-h-[48px] ${
@@ -504,7 +644,19 @@ export function AdminPage({ onBackToShop }) {
           }`}
         >
           <Package className="w-5 h-5 shrink-0" />
-          <span>GESTIÓN DE ÓRDENES Y DESPACHO ({orders.length})</span>
+          <span>ÓRDENES ({orders.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('commissions')}
+          className={`py-3 sm:py-3.5 px-4 sm:px-6 font-headline-md text-base sm:text-xl uppercase tracking-wider border-2 transition-all flex items-center justify-center space-x-3 min-h-[48px] ${
+            activeTab === 'commissions'
+              ? 'bg-[#e0141f] border-[#e0141f] text-white shadow-[0_0_20px_rgba(224,20,31,0.3)]'
+              : 'bg-[#141313] border-[#5e3f3c] text-neutral-400 hover:text-white'
+          }`}
+        >
+          <MessageSquare className="w-5 h-5 shrink-0" />
+          <span>COMISIONES ({contactMessages.length})</span>
         </button>
 
         <button
@@ -516,164 +668,404 @@ export function AdminPage({ onBackToShop }) {
           }`}
         >
           <Layers className="w-5 h-5 shrink-0" />
-          <span>CRUD DE PRODUCTOS Y STOCK</span>
+          <span>PRODUCTOS Y STOCK</span>
         </button>
       </div>
 
-      {/* TAB 1: GESTIÓN DE ÓRDENES */}
+      {/* TAB 1: GESTIÓN DE ÓRDENES (PRE-COLA VS. COLA DE PRODUCCIÓN OFICIAL) */}
       {activeTab === 'orders' && (
         <div className="space-y-6">
           <div className="p-4 bg-[#141313] border border-[#5e3f3c] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="font-headline-md text-2xl text-white uppercase">
-                RADAR DE PEDIDOS ENTRANTE
+                CONTROL DE ANTICIPOS Y COLA DE PRODUCCIÓN
               </h2>
               <p className="font-mono text-xs text-neutral-400">
-                Al cambiar el estado de cualquier orden, la Cloud Function despachará la plantilla correspondiente de WhatsApp al cliente sin intervención manual.
+                Los pedidos mayores a $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo del 20% con sus pesos únicos anti-fraude.
               </p>
             </div>
             <div className="px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-mono text-xs flex items-center space-x-2 shrink-0">
-              <Send className="w-3.5 h-3.5" />
-              <span>DESPACHADOR SERVER-SIDE AUTOMÁTICO</span>
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>CANDADO ANTI-FRAUDE 20% ACTIVO</span>
             </div>
+          </div>
+
+          {/* Sub-Filtros: Pre-Cola vs Cola Oficial */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setOrderQueueFilter('pre_queue')}
+              className={`px-4 py-2.5 font-mono text-xs uppercase font-bold border transition-all flex items-center gap-2 ${
+                orderQueueFilter === 'pre_queue'
+                  ? 'bg-amber-600 border-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)]'
+                  : 'bg-[#141313] border-[#5e3f3c] text-amber-300 hover:border-amber-400'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>1. Por Confirmar Anticipo ({preQueueOrders.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setOrderQueueFilter('official_queue')}
+              className={`px-4 py-2.5 font-mono text-xs uppercase font-bold border transition-all flex items-center gap-2 ${
+                orderQueueFilter === 'official_queue'
+                  ? 'bg-emerald-600 border-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                  : 'bg-[#141313] border-[#5e3f3c] text-emerald-300 hover:border-emerald-400'
+              }`}
+            >
+              <Hammer className="w-4 h-4" />
+              <span>2. Cola de Producción Oficial ({officialQueueOrders.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setOrderQueueFilter('split')}
+              className={`px-4 py-2.5 font-mono text-xs uppercase font-bold border transition-all flex items-center gap-2 ${
+                orderQueueFilter === 'split'
+                  ? 'bg-[#e0141f] border-[#e0141f] text-white'
+                  : 'bg-[#141313] border-[#5e3f3c] text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Ver Ambas Secciones Separadas</span>
+            </button>
           </div>
 
           {loadingOrders ? (
             <div className="py-20 text-center font-mono text-xs text-[#ffb4ab]">
-              CARGANDO ÓRDENES EN TIEMPO REAL DESDE FIRESTORE...
+              CARGANDO ÓRDENES EN TIEMPO REAL...
             </div>
           ) : (
-            <div className="overflow-x-auto bg-[#141313] border border-[#5e3f3c]">
-              <table className="w-full min-w-[860px] text-left font-mono text-xs border-collapse">
-                <thead>
-                  <tr className="bg-[#1d1b1b] border-b-2 border-[#e0141f] text-[#ffb4ab]">
-                    <th className="p-3">ORDEN / TRACKING</th>
-                    <th className="p-3">CLIENTE & CELULAR</th>
-                    <th className="p-3">DIRECCIÓN (COLOMBIA)</th>
-                    <th className="p-3">TOTAL</th>
-                    <th className="p-3">ACCIONES DE FLUJO (OMS)</th>
-                    <th className="p-3 text-right">WHATSAPP / DETALLE</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#2b2a29]">
-                  {orders.map((order) => {
-                    const isUpdating = updatingOrderId === order.id;
-                    const cleanPhone = String(order.customerData?.phone || order.phone || '').replace(/\D/g, '');
+            <div className="space-y-8">
+              {/* SECCIÓN 1: POR CONFIRMAR ANTICIPO (ESPERANDO_PAGO y VERIFICANDO_ANTICIPO) */}
+              {(orderQueueFilter === 'pre_queue' || orderQueueFilter === 'split') && (
+                <div className="bg-[#141313] border-2 border-amber-500/60 p-4 sm:p-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/30 pb-3">
+                    <div>
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-amber-400 block font-bold">
+                        SECCIÓN 1 // PRE-COLA DE VALIDACIÓN FINANCIERA
+                      </span>
+                      <h3 className="font-headline-md text-xl sm:text-2xl text-white uppercase">
+                        POR CONFIRMAR ANTICIPO DEL 20% ({preQueueOrders.length})
+                      </h3>
+                      <p className="font-mono text-[11px] text-neutral-400">
+                        Estos pedidos superan los $50.000 COP y NO entran a la cola de tejido hasta que verifiques el ingreso exacto en Nequi / Bre-B / Bancolombia.
+                      </p>
+                    </div>
+                  </div>
 
-                    // Estado siguiente en el ciclo de vida guiado
-                    let nextAction = null;
-                    if (order.status === 'placed') {
-                      nextAction = { label: '✓ Confirmar', nextStatus: 'confirmed', bg: 'bg-blue-600 hover:bg-blue-700' };
-                    } else if (order.status === 'confirmed') {
-                      nextAction = { label: '🧵 A Taller', nextStatus: 'in_production', bg: 'bg-purple-600 hover:bg-purple-700' };
-                    } else if (order.status === 'in_production') {
-                      nextAction = { label: '🚚 Despachar', nextStatus: 'shipped', bg: 'bg-amber-600 hover:bg-amber-700' };
-                    } else if (order.status === 'shipped') {
-                      nextAction = { label: '📦 Entregado', nextStatus: 'delivered', bg: 'bg-emerald-600 hover:bg-emerald-700' };
-                    }
+                  {preQueueOrders.length === 0 ? (
+                    <div className="py-8 text-center font-mono text-xs text-neutral-400 bg-[#1b1919] border border-[#363434]">
+                      No hay pedidos pendientes por confirmar anticipo en este momento.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {preQueueOrders.map((order) => {
+                        const isUpdating = updatingOrderId === order.id;
+                        const totalVal = Number(order.totalAmount || order.total || 0);
+                        const baseDep = Number(order.depositBaseAmount || Math.ceil(totalVal * 0.20));
+                        const exactExpected = Number(order.depositRequiredAmount || baseDep);
+                        const remBal = Number(order.remainingBalance ?? (totalVal - baseDep));
+                        const cleanPhone = String(order.customerData?.phone || order.phone || '').replace(/\D/g, '');
+                        const isVerifying = String(order.status || '').toUpperCase() === 'VERIFICANDO_ANTICIPO';
 
-                    return (
-                      <tr key={order.id} className="hover:bg-[#1a1818] transition-colors">
-                        <td className="p-3">
-                          <button
-                            onClick={() => setSelectedOrderDetail(order)}
-                            className="text-left group cursor-pointer block"
-                            title="Ver ficha completa de la orden"
+                        return (
+                          <div
+                            key={order.id}
+                            className={`p-4 border-2 font-mono text-xs space-y-3 flex flex-col justify-between ${
+                              isVerifying
+                                ? 'bg-amber-950/20 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.12)]'
+                                : 'bg-[#1a1818] border-[#5e3f3c]'
+                            }`}
                           >
-                            <strong className="text-white block font-bold group-hover:text-[#ffb4ab] transition-colors underline decoration-dotted">
-                              #{order.id}
-                            </strong>
-                            <span className="text-[10px] text-emerald-400">
-                              {order.trackingNumber || order.trackingCode || 'KURO-TRK-77X'}
-                            </span>
-                          </button>
-                        </td>
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-2 border-b border-[#363434] pb-2">
+                                <div>
+                                  <button
+                                    onClick={() => setSelectedOrderDetail(order)}
+                                    className="text-white font-bold text-sm hover:text-[#ffb4ab] underline decoration-dotted"
+                                  >
+                                    #{order.id}
+                                  </button>
+                                  <span className="block text-[10px] text-neutral-400">
+                                    Cliente: <strong className="text-white">{order.customerData?.name || order.customerName || 'Cliente'}</strong> • 📱 {order.customerData?.phone || order.phone}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
+                                    isVerifying
+                                      ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                                      : 'bg-red-950/60 border-red-500/50 text-[#ffb4ab]'
+                                  }`}
+                                >
+                                  {isVerifying ? '⚡ COMPROBANTE REPORTADO' : '⏳ ESPERANDO PAGO'}
+                                </span>
+                              </div>
 
-                        <td className="p-3">
-                          <div className="text-white font-bold">
-                            {order.customerData?.name || order.customerName || 'Cliente'}
-                          </div>
-                          <div className="text-[11px] text-neutral-400">
-                            📱 {order.customerData?.phone || order.phone || 'N/A'}
-                          </div>
-                        </td>
+                              {/* Monto Exacto Esperado y Referencia del Cliente */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-black/70 border border-amber-500/40">
+                                <div>
+                                  <span className="text-[10px] text-amber-300 uppercase block font-bold">
+                                    Monto Exacto Esperado (20% + ID)
+                                  </span>
+                                  <strong className="font-headline-md text-2xl sm:text-3xl text-amber-400 tracking-wider block">
+                                    {formatCOP(exactExpected)}
+                                  </strong>
+                                  <span className="text-[10px] text-neutral-400">
+                                    Total orden: {formatCOP(totalVal)} • Saldo 80%: {formatCOP(remBal)}
+                                  </span>
+                                </div>
 
-                        <td className="p-3 max-w-xs text-neutral-300">
-                          <span className="line-clamp-2">
-                            {order.customerData?.shippingAddress || order.address || 'Medellín'}
-                          </span>
-                        </td>
+                                <div className="border-t sm:border-t-0 sm:border-l border-neutral-800 pt-2 sm:pt-0 sm:pl-3">
+                                  <span className="text-[10px] text-neutral-400 uppercase block">
+                                    Referencia / Comprobante Cliente
+                                  </span>
+                                  {order.paymentReference ? (
+                                    <strong className="text-sm text-emerald-400 font-bold tracking-wider block mt-0.5 break-all">
+                                      REF: {order.paymentReference}
+                                    </strong>
+                                  ) : (
+                                    <span className="text-xs text-neutral-500 italic block mt-0.5">
+                                      Aún no ha enviado número de referencia
+                                    </span>
+                                  )}
+                                  {order.paymentProofUrl && (
+                                    <a
+                                      href={order.paymentProofUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[10px] text-[#ffb4ab] underline mt-1"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      <span>Ver captura de pago</span>
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
 
-                        <td className="p-3">
-                          <strong className="text-white font-bold block">
-                            {formatCOP(order.totalAmount || order.total)}
-                          </strong>
-                          <span className="text-[10px] text-[#ffb4ab]">
-                            Contraentrega
-                          </span>
-                        </td>
+                              <div className="text-[11px] text-neutral-300">
+                                <strong className="text-neutral-500">Piezas:</strong>{' '}
+                                {(order.items || []).map((it) => `${it.quantity || 1}x ${it.title}`).join(', ')}
+                              </div>
+                            </div>
 
-                        <td className="p-3">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                            {/* Botón de acción rápida en 1 clic */}
-                            {nextAction && order.status !== 'cancelled' && (
+                            {/* Botones de Acción de Confirmación o Rechazo */}
+                            <div className="pt-2 border-t border-[#363434] flex flex-col sm:flex-row gap-2">
                               <button
-                                onClick={() => handleStatusChange(order.id, nextAction.nextStatus)}
+                                type="button"
                                 disabled={isUpdating}
-                                className={`px-2.5 py-1 text-white font-bold text-[10px] uppercase transition-all shadow ${nextAction.bg} disabled:opacity-50 shrink-0`}
+                                onClick={() => handleVerifyDeposit(order.id, 'CONFIRM')}
+                                className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-black font-bold text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 cursor-pointer"
                               >
-                                {nextAction.label}
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                                <span>Confirmar que llegó la plata -&gt; Enviar a la Cola</span>
                               </button>
-                            )}
 
-                            {/* Selector manual para cualquier estado */}
-                            <select
-                              value={order.status}
-                              disabled={isUpdating}
-                              onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                              className="bg-[#211f1f] border border-[#5e3f3c] text-white px-2 py-1 font-mono text-xs focus:border-[#e0141f] outline-none cursor-pointer disabled:opacity-50"
-                            >
-                              {ORDER_STATUS_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-[#141313]">
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-
-                            {isUpdating && (
-                              <RefreshCw className="w-3.5 h-3.5 text-[#e0141f] animate-spin" />
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="p-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {cleanPhone && (
-                              <a
-                                href={`https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20tu%20orden%20%23${order.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-2 py-1 bg-emerald-950/80 border border-emerald-500/50 hover:bg-emerald-900 text-emerald-300 text-[10px] uppercase font-bold flex items-center gap-1"
-                                title="Abrir chat en WhatsApp"
+                              <button
+                                type="button"
+                                disabled={isUpdating}
+                                onClick={() => handleVerifyDeposit(order.id, 'REJECT')}
+                                className="py-2.5 px-3 bg-red-950/90 hover:bg-red-900 border border-red-600 text-red-200 font-bold text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                               >
-                                <MessageSquare className="w-3 h-3 fill-emerald-300" />
-                                <span className="hidden sm:inline">WhatsApp</span>
-                              </a>
-                            )}
-                            <button
-                              onClick={() => setSelectedOrderDetail(order)}
-                              className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] uppercase font-bold"
-                              title="Ver detalle completo"
-                            >
-                              Ficha
-                            </button>
+                                <XCircle className="w-4 h-4 shrink-0" />
+                                <span>Rechazar / Pago no recibido</span>
+                              </button>
+
+                              {cleanPhone && (
+                                <a
+                                  href={`https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20el%20anticipo%20de%20tu%20orden%20%23${order.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="py-2.5 px-3 bg-[#1d1b1b] hover:bg-neutral-800 border border-[#5e3f3c] text-emerald-400 font-bold text-[11px] uppercase flex items-center justify-center gap-1"
+                                  title="Contactar por WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5" />
+                                  <span>WA</span>
+                                </a>
+                              )}
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SECCIÓN 2: COLA DE PRODUCCIÓN OFICIAL (EN_COLA, IN_PRODUCTION, SHIPPED, DELIVERED) */}
+              {(orderQueueFilter === 'official_queue' || orderQueueFilter === 'split') && (
+                <div className="space-y-3">
+                  <div className="p-4 bg-[#141313] border-l-4 border-emerald-500 border-t border-r border-b border-[#5e3f3c] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-400 block font-bold">
+                        SECCIÓN 2 // TRABAJO REAL EN TALLER (ORDENADO POR LLEGADA / PAGO CONFIRMADO)
+                      </span>
+                      <h3 className="font-headline-md text-xl sm:text-2xl text-white uppercase">
+                        COLA DE PRODUCCIÓN OFICIAL ({officialQueueOrders.length})
+                      </h3>
+                    </div>
+                    <span className="font-mono text-[11px] text-neutral-400">
+                      Orden estricto por <code className="text-emerald-400">queuedAt</code> (quién pagó primero)
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto bg-[#141313] border border-[#5e3f3c]">
+                    <table className="w-full min-w-[920px] text-left font-mono text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#1d1b1b] border-b-2 border-[#e0141f] text-[#ffb4ab]">
+                          <th className="p-3">PUESTO / ORDEN</th>
+                          <th className="p-3">CLIENTE & CELULAR</th>
+                          <th className="p-3">DIRECCIÓN (BOGOTÁ / COL)</th>
+                          <th className="p-3">TOTAL & SALDO 80%</th>
+                          <th className="p-3">ACCIONES DE FLUJO (OMS)</th>
+                          <th className="p-3 text-right">WHATSAPP / DETALLE</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#2b2a29]">
+                        {officialQueueOrders.map((order, index) => {
+                          const isUpdating = updatingOrderId === order.id;
+                          const cleanPhone = String(order.customerData?.phone || order.phone || '').replace(/\D/g, '');
+                          const totalVal = Number(order.totalAmount || order.total || 0);
+                          const remBalance =
+                            Number(order.remainingBalance) > 0
+                              ? Number(order.remainingBalance)
+                              : totalVal > 50000
+                              ? totalVal - Math.ceil(totalVal * 0.20)
+                              : totalVal;
+
+                          // Estado siguiente en el ciclo de vida guiado
+                          let nextAction = null;
+                          if (order.status === 'placed') {
+                            nextAction = { label: '✓ Confirmar', nextStatus: 'confirmed', bg: 'bg-blue-600 hover:bg-blue-700' };
+                          } else if (order.status === 'confirmed' || order.status === 'EN_COLA') {
+                            nextAction = { label: '🧵 A Taller', nextStatus: 'in_production', bg: 'bg-purple-600 hover:bg-purple-700' };
+                          } else if (order.status === 'in_production') {
+                            nextAction = { label: '🚚 Despachar', nextStatus: 'shipped', bg: 'bg-amber-600 hover:bg-amber-700' };
+                          } else if (order.status === 'shipped') {
+                            nextAction = { label: '📦 Entregado', nextStatus: 'delivered', bg: 'bg-emerald-600 hover:bg-emerald-700' };
+                          }
+
+                          return (
+                            <tr key={order.id} className="hover:bg-[#1a1818] transition-colors">
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2 py-0.5 bg-emerald-950 border border-emerald-500/50 text-emerald-300 font-bold text-[10px]">
+                                    #{index + 1} EN COLA
+                                  </span>
+                                  <button
+                                    onClick={() => setSelectedOrderDetail(order)}
+                                    className="text-left group cursor-pointer block"
+                                    title="Ver ficha completa de la orden"
+                                  >
+                                    <strong className="text-white block font-bold group-hover:text-[#ffb4ab] transition-colors underline decoration-dotted">
+                                      #{order.id}
+                                    </strong>
+                                  </button>
+                                </div>
+                                <span className="text-[10px] text-emerald-400 block mt-0.5">
+                                  {order.trackingNumber || order.trackingCode || 'KURO-TRK-77X'}
+                                </span>
+                                {order.queuedAt && (
+                                  <span className="text-[9px] text-neutral-500 block">
+                                    Cola: {new Date(order.queuedAt).toLocaleString('es-CO')}
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="p-3">
+                                <div className="text-white font-bold">
+                                  {order.customerData?.name || order.customerName || 'Cliente'}
+                                </div>
+                                <div className="text-[11px] text-neutral-400">
+                                  📱 {order.customerData?.phone || order.phone || 'N/A'}
+                                </div>
+                              </td>
+
+                              <td className="p-3 max-w-xs text-neutral-300">
+                                <span className="line-clamp-2">
+                                  {order.customerData?.shippingAddress || order.address || 'Bogotá'}
+                                </span>
+                              </td>
+
+                              <td className="p-3">
+                                <strong className="text-white font-bold block">
+                                  Total: {formatCOP(totalVal)}
+                                </strong>
+                                <span className="text-[10px] text-amber-300 font-bold block">
+                                  Cobrar al entregar: {formatCOP(remBalance)}
+                                </span>
+                                {order.paymentReference && (
+                                  <span className="text-[9px] text-emerald-400 block">
+                                    ✓ Anticipo Ref: {order.paymentReference}
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="p-3">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                                  {/* Botón de acción rápida en 1 clic */}
+                                  {nextAction && order.status !== 'cancelled' && (
+                                    <button
+                                      onClick={() => handleStatusChange(order.id, nextAction.nextStatus)}
+                                      disabled={isUpdating}
+                                      className={`px-2.5 py-1 text-white font-bold text-[10px] uppercase transition-all shadow ${nextAction.bg} disabled:opacity-50 shrink-0`}
+                                    >
+                                      {nextAction.label}
+                                    </button>
+                                  )}
+
+                                  {/* Selector manual para cualquier estado */}
+                                  <select
+                                    value={order.status}
+                                    disabled={isUpdating}
+                                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                    className="bg-[#211f1f] border border-[#5e3f3c] text-white px-2 py-1 font-mono text-xs focus:border-[#e0141f] outline-none cursor-pointer disabled:opacity-50"
+                                  >
+                                    {ORDER_STATUS_OPTIONS.map((opt) => (
+                                      <option key={opt.value} value={opt.value} className="bg-[#141313]">
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  {isUpdating && (
+                                    <RefreshCw className="w-3.5 h-3.5 text-[#e0141f] animate-spin" />
+                                  )}
+                                </div>
+                              </td>
+
+                              <td className="p-3 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  {cleanPhone && (
+                                    <a
+                                      href={`https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20tu%20orden%20%23${order.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2 py-1 bg-emerald-950/80 border border-emerald-500/50 hover:bg-emerald-900 text-emerald-300 text-[10px] uppercase font-bold flex items-center gap-1"
+                                      title="Abrir chat en WhatsApp"
+                                    >
+                                      <MessageSquare className="w-3 h-3 fill-emerald-300" />
+                                      <span className="hidden sm:inline">WhatsApp</span>
+                                    </a>
+                                  )}
+                                  <button
+                                    onClick={() => setSelectedOrderDetail(order)}
+                                    className="px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] uppercase font-bold"
+                                    title="Ver detalle completo"
+                                  >
+                                    Ficha
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -704,6 +1096,28 @@ export function AdminPage({ onBackToShop }) {
                     <span className="text-neutral-500 text-[10px] uppercase block">Tracking Code</span>
                     <strong className="text-emerald-400 block">{selectedOrderDetail.trackingNumber || selectedOrderDetail.trackingCode}</strong>
                     <span className="text-[#ffb4ab] text-xs font-bold block pt-1">Total: {formatCOP(selectedOrderDetail.totalAmount || selectedOrderDetail.total)}</span>
+                  </div>
+                </div>
+
+                {/* Desglose de Anticipo 20% y Saldo Restante 80% */}
+                <div className="bg-black/60 p-3 border border-amber-500/40 grid grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-[9px] text-neutral-400 uppercase block">Anticipo Exacto</span>
+                    <strong className="text-amber-400 text-xs">
+                      {formatCOP(selectedOrderDetail.depositRequiredAmount || 0)}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-neutral-400 uppercase block">Ref. Bancaria</span>
+                    <strong className="text-emerald-400 text-xs">
+                      {selectedOrderDetail.paymentReference || 'N/A'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-neutral-400 uppercase block">Saldo Entrega</span>
+                    <strong className="text-white text-xs">
+                      {formatCOP(selectedOrderDetail.remainingBalance ?? (selectedOrderDetail.totalAmount || selectedOrderDetail.total))}
+                    </strong>
                   </div>
                 </div>
 
@@ -755,7 +1169,145 @@ export function AdminPage({ onBackToShop }) {
         </div>
       )}
 
-      {/* TAB 2: CRUD DE PRODUCTOS */}
+      {/* TAB 2: COMISIONES Y CONTACTOS ENTRANTE */}
+      {activeTab === 'commissions' && (
+        <div className="space-y-6">
+          <div className="p-4 bg-[#141313] border border-[#5e3f3c] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-headline-md text-2xl text-white uppercase">
+                RADAR DE COMISIONES Y ENCARGOS 1-DE-1
+              </h2>
+              <p className="font-mono text-xs text-neutral-400">
+                Solicitudes de piezas a medida, consultas de punto de cruz y mensajes directos recibidos desde la página de contacto.
+              </p>
+            </div>
+            <div className="px-3 py-1.5 bg-[#e0141f]/20 border border-[#e0141f]/40 text-[#ffb4ab] font-mono text-xs flex items-center space-x-2 shrink-0">
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>TOTAL RECIBIDOS: {contactMessages.length}</span>
+            </div>
+          </div>
+
+          {contactMessages.length === 0 ? (
+            <div className="py-20 text-center bg-[#141313] border border-[#5e3f3c] font-mono text-xs text-neutral-400 space-y-2">
+              <p className="text-sm text-[#ffb4ab]">NO HAY COMISIONES PENDIENTES</p>
+              <p>Las nuevas solicitudes enviadas por los clientes aparecerán aquí automáticamente en tiempo real.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {contactMessages.map((msg) => {
+                const dateStr = msg.createdAt?.toDate ? msg.createdAt.toDate().toLocaleString('es-CO') : (msg.createdAt || 'Reciente');
+                const hasPhone = Boolean(msg.phone && String(msg.phone).trim());
+                const waUrl = hasPhone ? generateAdminToCustomerWhatsAppUrl(msg) : null;
+
+                return (
+                  <div key={msg.id} className="bg-[#141313] border-2 border-[#5e3f3c] hover:border-[#e0141f] p-5 space-y-4 font-mono text-xs transition-colors flex flex-col justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between border-b border-[#5e3f3c] pb-2">
+                        <div>
+                          <span className="text-[10px] text-[#ffb4ab] font-bold uppercase tracking-wider block">
+                            {msg.typeLabel || (msg.type === 'commission' ? 'COMISIÓN 1-DE-1' : msg.type)}
+                          </span>
+                          <strong className="text-white text-base block font-headline-sm">{msg.name}</strong>
+                        </div>
+                        <span className="text-[10px] text-neutral-500">{dateStr}</span>
+                      </div>
+
+                      {/* Estimation details pills */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.sizeLabel && (
+                          <span className="px-2 py-0.5 bg-[#1d1b1b] border border-[#5e3f3c] text-neutral-300 text-[10px]">
+                            📏 {msg.sizeLabel}
+                          </span>
+                        )}
+                        {msg.hasPlatform !== undefined && (
+                          <span className={`px-2 py-0.5 text-[10px] border ${msg.hasPlatform ? 'bg-[#e0141f]/20 border-[#e0141f] text-[#ffb4ab]' : 'bg-[#1d1b1b] border-[#5e3f3c] text-neutral-400'}`}>
+                            {msg.hasPlatform ? '🪵 Con Base' : 'Portátil'}
+                          </span>
+                        )}
+                        {msg.complexityLabel && (
+                          <span className="px-2 py-0.5 bg-[#1d1b1b] border border-[#5e3f3c] text-neutral-300 text-[10px]">
+                            ⚡ {msg.complexityLabel}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Estimated Price & Production Days */}
+                      {(msg.estimatedPrice || msg.estimatedDays) && (
+                        <div className="grid grid-cols-2 gap-2 p-2.5 bg-[#1d1b1b] border border-[#363434]">
+                          <div>
+                            <span className="text-[9px] text-neutral-500 block uppercase">Estimación Base</span>
+                            <span className="text-sm font-bold text-[#ffb4ab]">
+                              {msg.estimatedPrice ? formatCOP(msg.estimatedPrice) : 'A definir'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] text-neutral-500 block uppercase">Tiempo Taller</span>
+                            <span className="text-xs font-bold text-white">
+                              {msg.estimatedDays ? `${msg.estimatedDays} días hábiles` : 'A coordinar'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-1 text-neutral-300">
+                        <p><strong className="text-neutral-500">Email:</strong> <a href={`mailto:${msg.email}`} className="text-[#ffb4ab] underline">{msg.email}</a></p>
+                        {hasPhone && <p><strong className="text-neutral-500">WhatsApp / Móvil:</strong> <span className="text-white font-bold">{msg.phone}</span></p>}
+                      </div>
+
+                      <div className="bg-[#1d1b1b] p-3 border border-[#363434] text-neutral-200 whitespace-pre-wrap leading-relaxed">
+                        <span className="text-[10px] text-neutral-500 uppercase block mb-1">Descripción / Requerimiento:</span>
+                        "{msg.message || 'Sin descripción adicional'}"
+                      </div>
+
+                      {/* Photos if any */}
+                      {Array.isArray(msg.images) && msg.images.length > 0 && (
+                        <div>
+                          <span className="text-[10px] text-neutral-500 uppercase block mb-1">Fotos de Referencia ({msg.images.length}):</span>
+                          <div className="flex gap-2 flex-wrap">
+                            {msg.images.map((imgUrl, i) => (
+                              <a key={i} href={imgUrl} target="_blank" rel="noopener noreferrer" className="block w-14 h-14 border border-[#5e3f3c] hover:border-[#e0141f] overflow-hidden bg-black">
+                                <img src={imgUrl} alt={`ref-${i}`} className="w-full h-full object-cover" />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions: Direct WhatsApp to customer & Email */}
+                    <div className="pt-2 flex flex-col sm:flex-row gap-2 border-t border-[#363434]">
+                      {hasPhone && waUrl ? (
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 py-2.5 px-3 bg-[#25D366] hover:bg-[#20bd5a] text-black font-bold uppercase flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                          title="Contactar al cliente directamente por WhatsApp"
+                        >
+                          <MessageSquare className="w-4 h-4 fill-black" />
+                          <span>Contactar al Cliente vía WhatsApp</span>
+                        </a>
+                      ) : (
+                        <span className="py-2 px-3 bg-[#252222] text-neutral-500 text-center font-bold uppercase">
+                          Sin teléfono registrado
+                        </span>
+                      )}
+                      <a
+                        href={`mailto:${msg.email}?subject=KuroPunk%20//%20Cotización%20de%20tu%20encargo&body=Hola%20${encodeURIComponent(msg.name)},%20te%20escribimos%20del%20taller%20KuroPunk...`}
+                        className="py-2.5 px-3 bg-[#1d1b1b] hover:bg-[#252222] border border-[#5e3f3c] text-white text-center uppercase tracking-wider font-bold transition-colors"
+                      >
+                        Email
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: CRUD DE PRODUCTOS */}
       {activeTab === 'products' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form Column */}

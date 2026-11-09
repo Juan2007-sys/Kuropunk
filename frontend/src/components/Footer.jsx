@@ -30,7 +30,7 @@ export const Footer = ({ setCurrentView }) => {
             Amigurumis rebeldes y punto de cruz para el coleccionista urbano. Meticulosa artesanía y resistencia callejera, creados a mano para desafiar el plástico masivo.
           </p>
           <div className="pt-2 text-xs font-mono text-[#8a8a86]">
-            TALLER: SUB-NIVEL 4 // MEDELLÍN, COLOMBIA
+            BOGOTÁ, COLOMBIA
           </div>
         </div>
 
@@ -71,12 +71,12 @@ export const Footer = ({ setCurrentView }) => {
             REDES & COMUNIDAD
           </div>
           <a
-            href="https://instagram.com"
+            href="https://www.instagram.com/kuropunk_/"
             target="_blank"
             rel="noopener noreferrer"
             className="font-body-md text-sm text-[#e7bcb8]/70 hover:text-[#ffb4ab] transition-colors flex items-center gap-2 min-h-[40px]"
           >
-            <span className="w-1.5 h-1.5 bg-[#e0141f]"></span> Instagram Oficial
+            <span className="w-1.5 h-1.5 bg-[#e0141f]"></span> Instagram Oficial (@kuropunk_)
           </a>
           <a
             href="https://discord.com"

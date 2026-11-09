@@ -16,11 +16,11 @@ import {
 } from 'lucide-react';
 
 const STATUS_STEPS = [
-  { key: 'placed', label: 'Registrado', icon: Clock, desc: 'Orden recibida en sistema' },
-  { key: 'confirmed', label: 'Confirmado', icon: CheckCircle, desc: 'Revisado por el artesano' },
-  { key: 'in_production', label: 'En Taller', icon: Hammer, desc: 'Tejiendo y ensamblando' },
-  { key: 'shipped', label: 'En Ruta', icon: Truck, desc: 'Entrega personal en camino' },
-  { key: 'delivered', label: 'Entregado', icon: CheckCircle, desc: 'Entregado y pagado en mano' }
+  { key: 'esperando_pago', label: '1. Anticipo 20%', icon: Clock, desc: 'Reserva para órdenes > $50k' },
+  { key: 'en_cola', label: '2. En Cola Oficial', icon: CheckCircle, desc: 'Anticipo validado / Turno asignado' },
+  { key: 'in_production', label: '3. En Taller', icon: Hammer, desc: 'Tejiendo y ensamblando' },
+  { key: 'shipped', label: '4. En Ruta', icon: Truck, desc: 'Entrega personal en camino' },
+  { key: 'delivered', label: '5. Entregado', icon: CheckCircle, desc: 'Entregado y saldo pagado' }
 ];
 
 export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
@@ -45,7 +45,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
             customerData: {
               name: currentUser.displayName || 'Santiago Vélez',
               phone: currentUser.phoneNumber || '+57 301 569 0382',
-              shippingAddress: 'Carrera 43A # 1-50, Apto 501, El Poblado (Medellín)'
+              shippingAddress: 'Carrera 7 # 72 - 41, Apto 501, Chapinero (Bogotá)'
             },
             items: [
               { title: 'The Wanderer - Amigurumi Flagship', quantity: 1, unitPrice: 145000 },
@@ -82,8 +82,12 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
   }, [currentUser]);
 
   const getStepIndex = (status) => {
-    const idx = STATUS_STEPS.findIndex((s) => s.key === status);
-    return idx >= 0 ? idx : 0;
+    const s = String(status || '').toUpperCase();
+    if (s.includes('DELIVER') || s.includes('ENTREG')) return 4;
+    if (s.includes('SHIP') || s.includes('RUTA') || s.includes('DISPATCH')) return 3;
+    if (s.includes('PRODUCT') || s.includes('TALLER')) return 2;
+    if (s === 'EN_COLA' || s === 'CONFIRMED' || s === 'PLACED') return 1;
+    return 0; // ESPERANDO_PAGO o VERIFICANDO_ANTICIPO
   };
 
   return (
@@ -286,13 +290,39 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                       ))}
                     </div>
 
-                    <div className="border-t border-[#333] pt-2 flex justify-between items-center font-mono">
-                      <span className="text-xs text-[#ffb4ab] uppercase">
-                        TOTAL A PAGAR CONTRAENTREGA:
-                      </span>
-                      <span className="font-headline-md text-xl text-white">
-                        {formatCOP(order.totalAmount || order.total)}
-                      </span>
+                    <div className="border-t border-[#333] pt-2 space-y-1 font-mono text-xs">
+                      <div className="flex justify-between text-neutral-400">
+                        <span>Total del Pedido:</span>
+                        <span className="text-white font-bold">{formatCOP(order.totalAmount || order.total)}</span>
+                      </div>
+                      {(order.requiresDeposit || Number(order.totalAmount || order.total) > 50000) && (
+                        <div className="flex justify-between text-[#ffb4ab]">
+                          <span>Anticipo (20%):</span>
+                          <span>
+                            {formatCOP(
+                              order.depositRequiredAmount ||
+                                order.depositBaseAmount ||
+                                Math.ceil(Number(order.totalAmount || order.total) * 0.20),
+                            )}{' '}
+                            ({order.paymentStatus || 'PENDIENTE'})
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-xs text-emerald-400 uppercase font-bold">
+                          SALDO RESTANTE EN LA ENTREGA:
+                        </span>
+                        <span className="font-headline-md text-xl text-emerald-400">
+                          {formatCOP(
+                            order.remainingBalance !== undefined
+                              ? order.remainingBalance
+                              : Number(order.totalAmount || order.total) > 50000
+                              ? Number(order.totalAmount || order.total) -
+                                Math.ceil(Number(order.totalAmount || order.total) * 0.20)
+                              : order.totalAmount || order.total,
+                          )}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

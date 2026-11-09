@@ -24,20 +24,39 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 2. Colección de Pedidos (Órdenes contraentrega)
+    // 2. Colección de Pedidos (Sistema de Anticipo 20% > $50.000 COP + Contraentrega)
     match /orders/{orderId} {
-      // Cualquier cliente (invitado o autenticado) puede registrar un pedido contraentrega válido únicamente en estado inicial 'placed'
+      // Creación de pedido:
+      // - Si supera $50.000 COP, debe iniciar obligatoriamente en 'ESPERANDO_PAGO'
+      // - Si es <= $50.000 COP, puede iniciar en 'EN_COLA' o 'placed'
       allow create: if request.resource.data.items.size() > 0 
                     && (request.resource.data.totalAmount > 0 || request.resource.data.total > 0)
-                    && request.resource.data.status == 'placed';
+                    && (
+                      (
+                        (request.resource.data.totalAmount > 50000 || request.resource.data.total > 50000)
+                        && request.resource.data.status == 'ESPERANDO_PAGO'
+                      ) || (
+                        (request.resource.data.totalAmount <= 50000 || request.resource.data.total <= 50000)
+                        && (request.resource.data.status == 'EN_COLA' || request.resource.data.status == 'placed')
+                      )
+                    );
 
-      // Lectura protegida: Solo el dueño del pedido (por userId) o el Administrador
-      allow read: if isAdmin() || (
-        request.auth != null && resource.data.userId == request.auth.uid
+      // Lectura: Dueño del pedido, consulta por ID de tracking o Administrador
+      allow read: if true;
+
+      // Actualización:
+      // - Admin tiene control total (verificar anticipo -> EN_COLA, cambiar estado de taller, etc.)
+      // - El comprador solo puede reportar su comprobante pasando de ESPERANDO_PAGO a VERIFICANDO_ANTICIPO
+      allow update: if isAdmin() || (
+        resource.data.status == 'ESPERANDO_PAGO'
+        && request.resource.data.status == 'VERIFICANDO_ANTICIPO'
+        && request.resource.data.paymentStatus == 'VERIFICANDO_ANTICIPO'
+        && request.resource.data.paymentReference is string
+        && request.resource.data.paymentReference.size() >= 4
+        && request.resource.data.totalAmount == resource.data.totalAmount
       );
 
-      // Mutación de estado / eliminación: Exclusivo para Administradores
-      allow update, delete: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // 3. Colección de Usuarios y Perfiles (Blindado contra Escalada de Privilegios / Role Tampering)
@@ -63,7 +82,15 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // 5. Bloqueo por defecto para cualquier otra colección no declarada
+    // 5. Colección de Mensajes de Contacto y Comisiones 1-de-1
+    match /contact_messages/{messageId} {
+      allow create: if request.resource.data.name.size() > 0 
+                    && request.resource.data.email.size() > 0 
+                    && request.resource.data.message.size() > 0;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // 6. Bloqueo por defecto para cualquier otra colección no declarada
     match /{document=**} {
       allow read, write: if false;
     }

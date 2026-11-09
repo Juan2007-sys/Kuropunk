@@ -47,7 +47,7 @@ export const OurStoryPage = ({ setCurrentView }) => {
           className="mb-14 relative inline-block self-start"
         >
           <div className="tape-overlay !top-[-16px] !-left-4 !rotate-[-4deg]">
-            FUNDADO EN 2024 // MEDELLÍN, COLOMBIA
+            FUNDADO EN 2024 // BOGOTÁ, COLOMBIA
           </div>
           <h1 className="font-stencil text-6xl sm:text-7xl lg:text-[88px] leading-[0.9] text-[#e6e1e1] uppercase relative z-10 pt-4">
             El Origen<br />

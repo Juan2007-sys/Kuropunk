@@ -11,9 +11,13 @@ import { OrderEntity } from '../../database/entities/order.entity';
 import { OrderItemEntity } from '../../database/entities/order-item.entity';
 import { ProductEntity } from '../../database/entities/product.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { ReportPaymentDto, VerifyDepositDto } from './dto/report-payment.dto';
 import { WhatsAppService, WhatsAppOrderStatus } from './whatsapp.service';
 
 const ALLOWED_STATUSES = [
+  'ESPERANDO_PAGO',
+  'VERIFICANDO_ANTICIPO',
+  'EN_COLA',
   'PLACED',
   'PENDING',
   'CONFIRMED',
@@ -23,6 +27,8 @@ const ALLOWED_STATUSES = [
   'DELIVERED',
   'CANCELLED',
 ] as const;
+
+const DEPOSIT_THRESHOLD_COP = 50000;
 
 @Injectable()
 export class OrdersService {
@@ -143,9 +149,55 @@ export class OrdersService {
           itemsToSave.push(itemEntity);
         }
 
-        const shippingCost = subtotal >= 150000 ? 0 : 15000;
+        const shippingCost = 0; // Entrega personal acordada en Bogotá / Nacional
         const total = subtotal + shippingCost;
         const trackingCode = `KURO-TRK-${randomUUID().replace(/-/g, '').substring(0, 7).toUpperCase()}`;
+
+        // REGLA BLINDADA DE LOS $50.000 COP (Calculada estrictamente en el servidor)
+        const requiresDeposit = total > DEPOSIT_THRESHOLD_COP;
+        let depositBaseAmount = 0;
+        let depositRequiredAmount = 0;
+        let remainingBalance = total;
+        let paymentStatus = 'NO_REQUIERE';
+        let orderStatus = 'EN_COLA';
+        let queuedAt: Date | null = new Date();
+
+        if (requiresDeposit) {
+          depositBaseAmount = Math.ceil(total * 0.20);
+          remainingBalance = total - depositBaseAmount;
+          paymentStatus = 'PENDIENTE_ANTICIPO';
+          orderStatus = 'ESPERANDO_PAGO';
+          queuedAt = null; // No entra a la cola hasta verificar el anticipo
+
+          // Candado Anti-Fraude de Monto Único (1 a 99 pesos colombianos no usados en los últimos 30 min)
+          const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
+          const recentPending = await manager
+            .createQueryBuilder(OrderEntity, 'o')
+            .select(['o.depositRequiredAmount'])
+            .where('o.status = :st AND o.createdAt >= :since', {
+              st: 'ESPERANDO_PAGO',
+              since: thirtyMinsAgo,
+            })
+            .getMany();
+
+          const usedAmounts = new Set(
+            recentPending.map((o) => Math.round(Number(o.depositRequiredAmount))),
+          );
+
+          const availableOffsets: number[] = [];
+          for (let offset = 1; offset <= 99; offset++) {
+            if (!usedAmounts.has(depositBaseAmount + offset)) {
+              availableOffsets.push(offset);
+            }
+          }
+
+          const uniquePesos =
+            availableOffsets.length > 0
+              ? availableOffsets[Math.floor(Math.random() * availableOffsets.length)]
+              : Math.floor(Math.random() * 99) + 1;
+
+          depositRequiredAmount = depositBaseAmount + uniquePesos;
+        }
 
         const addressSegments = [
           createOrderDto.address,
@@ -169,7 +221,13 @@ export class OrdersService {
           subtotal,
           shippingCost,
           total,
-          status: 'CONFIRMED',
+          requiresDeposit,
+          depositBaseAmount,
+          depositRequiredAmount,
+          remainingBalance,
+          paymentStatus,
+          queuedAt,
+          status: orderStatus,
           trackingCode,
           items: itemsToSave,
         });
@@ -187,6 +245,83 @@ export class OrdersService {
       this.recentOrderFingerprints.delete(fingerprint);
       throw error;
     }
+  }
+
+  /**
+   * Cliente reporta el número de comprobante / referencia de transferencia del anticipo del 20%
+   */
+  async reportPayment(orderId: string, dto: ReportPaymentDto): Promise<OrderEntity> {
+    const cleanRef = (dto.paymentReference || '').trim().toUpperCase();
+    if (!cleanRef || cleanRef.length < 4) {
+      throw new BadRequestException('Debes ingresar un número de comprobante o referencia válido.');
+    }
+
+    return await this.runAtomicTransaction(async (manager) => {
+      const order = await manager.findOne(OrderEntity, {
+        where: { id: orderId },
+        relations: ['items'],
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Orden #${orderId} no encontrada.`);
+      }
+
+      // Candado Anti-Fraude: Verificar que esta referencia de pago NUNCA haya sido usada en otro pedido
+      const duplicateRefOrder = await manager
+        .createQueryBuilder(OrderEntity, 'o')
+        .where('UPPER(o.paymentReference) = :ref AND o.id != :id', {
+          ref: cleanRef,
+          id: orderId,
+        })
+        .getOne();
+
+      if (duplicateRefOrder) {
+        throw new ConflictException(
+          `El comprobante o referencia "${cleanRef}" ya fue registrado anteriormente en otro pedido. Verifica el número de tu transferencia.`,
+        );
+      }
+
+      order.paymentReference = cleanRef;
+      if (dto.paymentProofUrl) {
+        order.paymentProofUrl = dto.paymentProofUrl.trim();
+      }
+      order.paymentReportedAt = new Date();
+      order.paymentStatus = 'VERIFICANDO_ANTICIPO';
+      order.status = 'VERIFICANDO_ANTICIPO';
+
+      return await manager.save(OrderEntity, order);
+    });
+  }
+
+  /**
+   * Admin aprueba o rechaza el anticipo y asigna puesto oficial en la cola (queuedAt)
+   */
+  async verifyDeposit(orderId: string, dto: VerifyDepositDto): Promise<OrderEntity> {
+    const action = (dto.action || '').toUpperCase();
+
+    return await this.runAtomicTransaction(async (manager) => {
+      const order = await manager.findOne(OrderEntity, {
+        where: { id: orderId },
+        relations: ['items'],
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Orden #${orderId} no encontrada.`);
+      }
+
+      if (action === 'CONFIRM') {
+        order.paymentStatus = 'ANTICIPO_VERIFICADO';
+        order.status = 'EN_COLA';
+        order.queuedAt = new Date();
+      } else if (action === 'REJECT') {
+        order.paymentStatus = 'RECHAZADO';
+        order.status = 'ESPERANDO_PAGO';
+      } else {
+        throw new BadRequestException('Acción de verificación inválida.');
+      }
+
+      return await manager.save(OrderEntity, order);
+    });
   }
 
   async findOne(id: string): Promise<OrderEntity> {

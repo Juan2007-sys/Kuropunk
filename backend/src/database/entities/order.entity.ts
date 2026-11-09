@@ -33,8 +33,35 @@ export class OrderEntity {
   @Column({ type: 'float' })
   total: number;
 
+  @Column({ type: 'boolean', default: false })
+  requiresDeposit: boolean;
+
+  @Column({ type: 'float', default: 0 })
+  depositBaseAmount: number;
+
+  @Column({ type: 'float', default: 0 })
+  depositRequiredAmount: number;
+
+  @Column({ type: 'float', default: 0 })
+  remainingBalance: number;
+
+  @Column({ type: 'varchar', length: 50, default: 'NO_REQUIERE' })
+  paymentStatus: string; // 'NO_REQUIERE' | 'PENDIENTE_ANTICIPO' | 'VERIFICANDO_ANTICIPO' | 'ANTICIPO_VERIFICADO' | 'RECHAZADO'
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  paymentReference: string;
+
+  @Column({ type: 'text', nullable: true })
+  paymentProofUrl: string;
+
+  @Column({ type: 'datetime', nullable: true })
+  paymentReportedAt: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  queuedAt: Date;
+
   @Column({ type: 'varchar', length: 50, default: 'CONFIRMED' })
-  status: string; // 'PENDING' | 'CONFIRMED' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
+  status: string; // 'ESPERANDO_PAGO' | 'VERIFICANDO_ANTICIPO' | 'EN_COLA' | 'CONFIRMED' | 'IN_PRODUCTION' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   trackingCode: string;

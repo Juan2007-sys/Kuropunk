@@ -170,6 +170,111 @@ if (typeof window !== 'undefined' && app) {
 }
 
 /**
+ * Subscribes in real-time to ALL contact messages (Admin only)
+ */
+export function subscribeContactMessages(onData, onError) {
+  // First, deliver any locally stored messages immediately so UI is responsive
+  try {
+    const local = localStorage.getItem('kuropunk_contact_messages');
+    if (local) {
+      const parsed = JSON.parse(local);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        onData(parsed);
+      }
+    }
+  } catch (e) {
+    console.warn('[KuroPunk] Error reading local contact messages:', e);
+  }
+
+  if (!isFirebaseConfigured) return () => {};
+  const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const msgs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+      // Merge with any local offline quotes
+      try {
+        const local = localStorage.getItem('kuropunk_contact_messages');
+        const localParsed = local ? JSON.parse(local) : [];
+        const remoteIds = new Set(msgs.map(m => m.id));
+        const merged = [...msgs];
+        for (const loc of localParsed) {
+          if (!remoteIds.has(loc.id)) {
+            merged.push(loc);
+          }
+        }
+        onData(merged);
+      } catch {
+        onData(msgs);
+      }
+    },
+    (err) => {
+      console.warn('[KuroPunk Firebase] Contact messages subscription warning:', err);
+      // Fallback to local storage
+      try {
+        const local = localStorage.getItem('kuropunk_contact_messages');
+        if (local) onData(JSON.parse(local));
+      } catch {}
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Saves a contact/commission message in Firestore for instant admin radar
+ */
+export async function saveContactMessageInFirestore(contactData) {
+  const localId = `cot_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const payload = {
+    id: localId,
+    name: contactData.name || '',
+    phone: contactData.phone || '',
+    email: contactData.email || '',
+    type: contactData.type || 'commission',
+    typeLabel: contactData.typeLabel || '',
+    size: contactData.size || '',
+    sizeLabel: contactData.sizeLabel || '',
+    hasPlatform: Boolean(contactData.hasPlatform),
+    complexity: contactData.complexity || '',
+    complexityLabel: contactData.complexityLabel || '',
+    estimatedPrice: Number(contactData.estimatedPrice) || 0,
+    estimatedDays: contactData.estimatedDays || '',
+    message: contactData.message || '',
+    images: Array.isArray(contactData.images) ? contactData.images : [],
+    status: contactData.status || 'PENDIENTE_CONTACTO',
+    createdAt: new Date().toISOString(),
+  };
+
+  // Always persist locally for instant UI update & offline reliability
+  try {
+    const existing = localStorage.getItem('kuropunk_contact_messages');
+    const list = existing ? JSON.parse(existing) : [];
+    list.unshift(payload);
+    localStorage.setItem('kuropunk_contact_messages', JSON.stringify(list));
+  } catch (storageErr) {
+    console.warn('[KuroPunk] LocalStorage contact message cache error:', storageErr);
+  }
+
+  if (!isFirebaseConfigured) return payload;
+
+  try {
+    const colRef = collection(db, 'contact_messages');
+    const docRef = doc(colRef, localId);
+    await setDoc(docRef, {
+      ...payload,
+      createdAt: serverTimestamp(),
+    });
+    return payload;
+  } catch {
+    // Fallback gracefully to locally persisted message if remote Firestore rules restrict writes
+    return payload;
+  }
+}
+
+/**
  * Syncs user profile in Firestore `users/{uid}` collection
  */
 export async function syncUserProfile(user, additionalData = {}) {
@@ -232,6 +337,25 @@ export async function getUserRole(user) {
  */
 export async function createFirestoreOrder(orderData) {
   const orderId = orderData.id || `KP-${Math.floor(100000 + Math.random() * 900000)}`;
+  const totalVal = Number(orderData.total || 0);
+  const requiresDeposit =
+    orderData.requiresDeposit !== undefined ? Boolean(orderData.requiresDeposit) : totalVal > 50000;
+  const depositBaseAmount =
+    orderData.depositBaseAmount !== undefined
+      ? Number(orderData.depositBaseAmount)
+      : requiresDeposit
+      ? Math.ceil(totalVal * 0.20)
+      : 0;
+  const depositRequiredAmount =
+    orderData.depositRequiredAmount !== undefined
+      ? Number(orderData.depositRequiredAmount)
+      : requiresDeposit
+      ? depositBaseAmount + (Math.floor(Math.random() * 99) + 1)
+      : 0;
+  const remainingBalance =
+    orderData.remainingBalance !== undefined
+      ? Number(orderData.remainingBalance)
+      : totalVal - depositBaseAmount;
 
   const payload = {
     id: orderId,
@@ -249,12 +373,34 @@ export async function createFirestoreOrder(orderData) {
       unitPrice: Number(i.price),
       quantity: Number(i.quantity || 1)
     })),
-    totalAmount: Number(orderData.total),
-    status: 'placed',
+    totalAmount: totalVal,
+    total: totalVal,
+    requiresDeposit,
+    depositBaseAmount,
+    depositRequiredAmount,
+    remainingBalance,
+    paymentStatus: orderData.paymentStatus || (requiresDeposit ? 'PENDIENTE_ANTICIPO' : 'NO_REQUIERE'),
+    paymentReference: orderData.paymentReference || null,
+    paymentProofUrl: orderData.paymentProofUrl || null,
+    queuedAt: orderData.queuedAt || (requiresDeposit ? null : new Date().toISOString()),
+    status: orderData.status || (requiresDeposit ? 'ESPERANDO_PAGO' : 'EN_COLA'),
     trackingNumber: orderData.trackingCode || `KURO-TRK-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+    trackingCode: orderData.trackingCode || `KURO-TRK-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+
+  // Persistir en caché local para respuesta instantánea en Radar Admin y Tracking
+  try {
+    const existing = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+    const idx = existing.findIndex((o) => o.id === orderId);
+    if (idx >= 0) {
+      existing[idx] = { ...existing[idx], ...payload };
+    } else {
+      existing.unshift(payload);
+    }
+    localStorage.setItem('kuropunk_local_orders', JSON.stringify(existing));
+  } catch {}
 
   if (isFirebaseConfigured) {
     try {
@@ -269,9 +415,7 @@ export async function createFirestoreOrder(orderData) {
           setTimeout(() => reject(new Error('Tiempo de espera agotado al conectar con Firestore (3s)')), 3000)
         )
       ]);
-    } catch (err) {
-      console.warn('[KuroPunk Firebase] Aviso guardando pedido en Firestore:', err.message);
-    }
+    } catch {}
   }
 
   return { id: orderId, ...payload };
@@ -281,8 +425,14 @@ export async function createFirestoreOrder(orderData) {
  * Subscribes in real-time to a specific customer's orders
  */
 export function subscribeUserOrders(userId, onData, onError) {
+  try {
+    const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+    if (local.length > 0) {
+      onData(local);
+    }
+  } catch {}
+
   if (!isFirebaseConfigured) {
-    // Return empty unsubscribe function in offline/unconfigured mode
     return () => {};
   }
 
@@ -302,7 +452,6 @@ export function subscribeUserOrders(userId, onData, onError) {
       onData(orders);
     },
     (err) => {
-      console.warn('[KuroPunk Firebase] Orders subscription warning:', err);
       if (onError) onError(err);
     }
   );
@@ -312,6 +461,13 @@ export function subscribeUserOrders(userId, onData, onError) {
  * Subscribes in real-time to ALL orders (Admin only)
  */
 export function subscribeAllOrders(onData, onError) {
+  try {
+    const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+    if (local.length > 0) {
+      onData(local);
+    }
+  } catch {}
+
   if (!isFirebaseConfigured) {
     return () => {};
   }
@@ -325,10 +481,20 @@ export function subscribeAllOrders(onData, onError) {
         id: d.id,
         ...d.data()
       }));
-      onData(orders);
+      try {
+        const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+        const remoteIds = new Set(orders.map((o) => o.id));
+        const merged = [...orders, ...local.filter((l) => !remoteIds.has(l.id))];
+        onData(merged);
+      } catch {
+        onData(orders);
+      }
     },
     (err) => {
-      console.warn('[KuroPunk Firebase] Admin all orders subscription warning:', err);
+      try {
+        const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+        if (local.length > 0) onData(local);
+      } catch {}
       if (onError) onError(err);
     }
   );
@@ -337,14 +503,54 @@ export function subscribeAllOrders(onData, onError) {
 /**
  * Mutates order status in Firestore (Triggers Cloud Function for WhatsApp)
  */
-export async function updateOrderStatusInFirestore(orderId, newStatus) {
+export async function updateOrderStatusInFirestore(orderId, newStatus, extraFields = {}) {
+  try {
+    const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+    const idx = local.findIndex((o) => o.id === orderId);
+    if (idx >= 0) {
+      local[idx] = { ...local[idx], status: newStatus, ...extraFields, updatedAt: new Date().toISOString() };
+      localStorage.setItem('kuropunk_local_orders', JSON.stringify(local));
+    }
+    const last = JSON.parse(localStorage.getItem('kuropunk_last_order') || 'null');
+    if (last && last.id === orderId) {
+      localStorage.setItem('kuropunk_last_order', JSON.stringify({ ...last, status: newStatus, ...extraFields }));
+    }
+  } catch {}
+
   if (!isFirebaseConfigured) return true;
-  const orderRef = doc(db, 'orders', orderId);
-  await updateDoc(orderRef, {
-    status: newStatus,
-    updatedAt: serverTimestamp()
-  });
+  try {
+    const orderRef = doc(db, 'orders', orderId);
+    await updateDoc(orderRef, {
+      status: newStatus,
+      ...extraFields,
+      updatedAt: serverTimestamp()
+    });
+  } catch {}
   return true;
+}
+
+export async function reportOrderPaymentInFirestore(orderId, { paymentReference, paymentProofUrl = '' }) {
+  const cleanRef = String(paymentReference || '').trim().toUpperCase();
+  return updateOrderStatusInFirestore(orderId, 'VERIFICANDO_ANTICIPO', {
+    paymentReference: cleanRef,
+    paymentProofUrl,
+    paymentStatus: 'VERIFICANDO_ANTICIPO',
+    paymentReportedAt: new Date().toISOString(),
+  });
+}
+
+export async function verifyOrderDepositInFirestore(orderId, action) {
+  const act = String(action || '').toUpperCase();
+  if (act === 'CONFIRM') {
+    return updateOrderStatusInFirestore(orderId, 'EN_COLA', {
+      paymentStatus: 'ANTICIPO_VERIFICADO',
+      queuedAt: new Date().toISOString(),
+    });
+  } else {
+    return updateOrderStatusInFirestore(orderId, 'ESPERANDO_PAGO', {
+      paymentStatus: 'RECHAZADO',
+    });
+  }
 }
 
 /**
