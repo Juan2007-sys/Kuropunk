@@ -39,22 +39,24 @@ export function AdminGuard({ children, onBackToShop }) {
           Tu cuenta actual (<span className="text-[#ffb4ab] font-mono">{currentUser?.email || 'Sin sesión'}</span>) no cuenta con el Custom Claim de administrador en Firebase Auth.
         </p>
 
-        {/* Development QA Quick Role Switcher */}
-        <div className="p-4 bg-[#1d1b1b] border border-[#5e3f3c] mb-6">
-          <div className="flex items-center space-x-2 text-xs font-mono text-[#ffb4ab] mb-2">
-            <KeyRound className="w-4 h-4 text-emerald-400" />
-            <span>MODO TESTING // DESARROLLO LOCAL:</span>
+        {/* Development QA Quick Role Switcher (Restringido estrictamente a modo desarrollo local, oculto en producción) */}
+        {import.meta.env.DEV && (
+          <div className="p-4 bg-[#1d1b1b] border border-[#5e3f3c] mb-6">
+            <div className="flex items-center space-x-2 text-xs font-mono text-[#ffb4ab] mb-2">
+              <KeyRound className="w-4 h-4 text-emerald-400" />
+              <span>MODO TESTING // DESARROLLO LOCAL:</span>
+            </div>
+            <p className="font-mono text-xs text-neutral-400 mb-3">
+              Para evaluar el panel administrativo en tu máquina local, puedes activar la sesión de prueba:
+            </p>
+            <button
+              onClick={() => setDemoSession('admin')}
+              className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors"
+            >
+              ⚡ ACTIVAR SESIÓN DE ADMIN (TESTING LOCAL)
+            </button>
           </div>
-          <p className="font-mono text-xs text-neutral-400 mb-3">
-            Para evaluar el panel administrativo, puedes activar la sesión de prueba como Administrador Master:
-          </p>
-          <button
-            onClick={() => setDemoSession('admin')}
-            className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors"
-          >
-            ⚡ ACTIVAR SESIÓN DE ADMIN (TESTING QA)
-          </button>
-        </div>
+        )}
 
         <div className="flex justify-between items-center">
           <button
