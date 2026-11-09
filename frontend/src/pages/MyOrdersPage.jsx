@@ -190,7 +190,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3">
                       {STATUS_STEPS.map((step, idx) => {
                         const Icon = step.icon;
                         const isDone = idx < currentStepIdx;
@@ -209,7 +209,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                           >
                             <div className="flex items-center space-x-2 mb-1.5">
                               <Icon
-                                className={`w-4 h-4 ${
+                                className={`w-4 h-4 shrink-0 ${
                                   isCurrent
                                     ? 'text-[#e0141f] animate-pulse'
                                     : isDone
@@ -275,11 +275,11 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                     </span>
                     <div className="space-y-1.5 mb-3 font-mono text-xs">
                       {(order.items || []).map((item, i) => (
-                        <div key={i} className="flex justify-between text-neutral-300">
-                          <span>
+                        <div key={i} className="flex justify-between items-center gap-2 text-neutral-300">
+                          <span className="truncate pr-2">
                             {item.quantity}x {item.title}
                           </span>
-                          <span className="text-white">
+                          <span className="text-white shrink-0 font-bold">
                             {formatCOP((item.unitPrice || item.price) * item.quantity)}
                           </span>
                         </div>

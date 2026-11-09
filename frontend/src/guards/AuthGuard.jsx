@@ -7,9 +7,10 @@ import { Lock, ShieldAlert, UserCheck } from 'lucide-react';
  * AuthGuard: Blocks access to protected routes (like Checkout or MyOrders)
  * If not authenticated, displays authentication modal/fallback preserving redirect intent
  */
-export function AuthGuard({ children, fallbackMessage, intent = 'checkout' }) {
+export function AuthGuard({ children, fallbackMessage, intent = 'checkout', allowGuest = false }) {
   const { currentUser, loading, setRedirectIntent } = useAuth();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [guestBypass, setGuestBypass] = useState(false);
 
   if (loading) {
     return (
@@ -22,7 +23,7 @@ export function AuthGuard({ children, fallbackMessage, intent = 'checkout' }) {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser && !guestBypass) {
     return (
       <div className="max-w-lg mx-auto my-12 p-8 bg-[#141313] border-2 border-[#e0141f] shadow-[0_0_30px_rgba(224,20,31,0.2)]">
         <div className="flex items-center space-x-3 border-b border-[#5e3f3c] pb-4 mb-6">
@@ -53,6 +54,15 @@ export function AuthGuard({ children, fallbackMessage, intent = 'checkout' }) {
             <UserCheck className="w-5 h-5" />
             <span>INICIAR SESIÓN / REGISTRARME</span>
           </button>
+
+          {allowGuest && (
+            <button
+              onClick={() => setGuestBypass(true)}
+              className="w-full py-3 bg-neutral-900 hover:bg-neutral-800 text-[#ffb4ab] border border-[#5e3f3c] hover:border-[#ffb4ab] font-mono text-xs uppercase tracking-widest transition-all duration-200 flex items-center justify-center space-x-2"
+            >
+              <span>⚡ CONTINUAR COMO INVITADO (PAGO CONTRAENTREGA DIRECTO)</span>
+            </button>
+          )}
         </div>
 
         <AuthModal

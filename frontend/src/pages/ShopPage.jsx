@@ -54,41 +54,44 @@ export const ShopPage = ({ onSelectProduct }) => {
 
   // Compute Base Lists (Firestore merged with fallback catalog)
   const amigurumisBase = useMemo(() => {
-    if (!firestoreProducts || firestoreProducts.length === 0) return PRODUCTS;
+    const activeLocal = PRODUCTS.filter(p => p.isActive !== false);
+    if (!firestoreProducts || firestoreProducts.length === 0) return activeLocal;
     const liveAmis = firestoreProducts.filter(p => 
       p.isActive !== false &&
       (p.technique === 'amigurumi' || (!p.technique && p.category !== 'Punto de Cruz' && p.category !== 'Patrones'))
     );
-    if (liveAmis.length === 0) return PRODUCTS;
+    if (liveAmis.length === 0) return activeLocal;
 
     const liveIds = new Set(liveAmis.map(p => p.id));
-    const fallbacksNotOverridden = PRODUCTS.filter(p => !liveIds.has(p.id));
+    const fallbacksNotOverridden = activeLocal.filter(p => !liveIds.has(p.id));
     return [...liveAmis, ...fallbacksNotOverridden];
   }, [firestoreProducts]);
 
   const puntoCruzBase = useMemo(() => {
-    if (!firestoreProducts || firestoreProducts.length === 0) return PUNTO_CRUZ_PRODUCTS;
+    const activeLocal = PUNTO_CRUZ_PRODUCTS.filter(p => p.isActive !== false);
+    if (!firestoreProducts || firestoreProducts.length === 0) return activeLocal;
     const liveCruz = firestoreProducts.filter(p => 
       p.isActive !== false &&
       (p.technique === 'punto_cruz' || p.category === 'Punto de Cruz')
     );
-    if (liveCruz.length === 0) return PUNTO_CRUZ_PRODUCTS;
+    if (liveCruz.length === 0) return activeLocal;
 
     const liveIds = new Set(liveCruz.map(p => p.id));
-    const fallbacksNotOverridden = PUNTO_CRUZ_PRODUCTS.filter(p => !liveIds.has(p.id));
+    const fallbacksNotOverridden = activeLocal.filter(p => !liveIds.has(p.id));
     return [...liveCruz, ...fallbacksNotOverridden];
   }, [firestoreProducts]);
 
   const patronesBase = useMemo(() => {
-    if (!firestoreProducts || firestoreProducts.length === 0) return PATRONES_PRODUCTS;
+    const activeLocal = PATRONES_PRODUCTS.filter(p => p.isActive !== false);
+    if (!firestoreProducts || firestoreProducts.length === 0) return activeLocal;
     const livePatrones = firestoreProducts.filter(p => 
       p.isActive !== false &&
       (p.technique === 'patron' || p.technique === 'patron_pdf' || p.category === 'Patrones' || p.isPattern)
     );
-    if (livePatrones.length === 0) return PATRONES_PRODUCTS;
+    if (livePatrones.length === 0) return activeLocal;
 
     const liveIds = new Set(livePatrones.map(p => p.id));
-    const fallbacksNotOverridden = PATRONES_PRODUCTS.filter(p => !liveIds.has(p.id));
+    const fallbacksNotOverridden = activeLocal.filter(p => !liveIds.has(p.id));
     return [...livePatrones, ...fallbacksNotOverridden];
   }, [firestoreProducts]);
 
@@ -126,9 +129,9 @@ export const ShopPage = ({ onSelectProduct }) => {
 
     // Availability
     if (availabilityFilter === 'IN_STOCK') {
-      list = list.filter(p => p.stock > 0 && p.badge !== 'SOLD OUT');
+      list = list.filter(p => p.stock > 0 && p.badge !== 'SOLD OUT' && p.badge !== 'AGOTADO' && p.badgeType !== 'sold-out');
     } else if (availabilityFilter === 'LIMITED') {
-      list = list.filter(p => p.badge === 'LIMITED DROP' || p.badge === 'FLAGSHIP');
+      list = list.filter(p => p.badge === 'LIMITED DROP' || p.badge === 'EDICIÓN LIMITADA' || p.badge === 'FLAGSHIP');
     }
 
     // Series
@@ -244,10 +247,10 @@ export const ShopPage = ({ onSelectProduct }) => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             
             {/* Horizontal Text Tabs */}
-            <nav className="flex items-center gap-6 sm:gap-10 overflow-x-auto no-scrollbar" aria-label="Catálogo">
+            <nav className="flex items-center gap-4 sm:gap-10 overflow-x-auto no-scrollbar" aria-label="Catálogo">
               <button
                 onClick={() => setActiveTab('amigurumis')}
-                className={`text-xs sm:text-sm tracking-widest font-mono uppercase pb-3 transition-all relative whitespace-nowrap ${
+                className={`text-xs sm:text-sm tracking-widest font-mono uppercase pb-3 min-h-[44px] flex items-center transition-all relative whitespace-nowrap ${
                   activeTab === 'amigurumis'
                     ? 'text-white font-medium'
                     : 'text-neutral-500 hover:text-neutral-300'
@@ -263,41 +266,45 @@ export const ShopPage = ({ onSelectProduct }) => {
                 )}
               </button>
 
-              <button
-                onClick={() => setActiveTab('punto_cruz')}
-                className={`text-xs sm:text-sm tracking-widest font-mono uppercase pb-3 transition-all relative whitespace-nowrap ${
-                  activeTab === 'punto_cruz'
-                    ? 'text-white font-medium'
-                    : 'text-neutral-500 hover:text-neutral-300'
-                }`}
-              >
-                [ PUNTO CRUZ ({puntoCruzBase.length}) ]
-                {activeTab === 'punto_cruz' && (
-                  <motion.div
-                    layoutId="activeTabIndicator"
-                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF0033] shadow-[0_0_8px_rgba(255,0,51,0.8)]"
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                  />
-                )}
-              </button>
+              {puntoCruzBase.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('punto_cruz')}
+                  className={`text-xs sm:text-sm tracking-widest font-mono uppercase pb-3 min-h-[44px] flex items-center transition-all relative whitespace-nowrap ${
+                    activeTab === 'punto_cruz'
+                      ? 'text-white font-medium'
+                      : 'text-neutral-500 hover:text-neutral-300'
+                  }`}
+                >
+                  [ PUNTO CRUZ ({puntoCruzBase.length}) ]
+                  {activeTab === 'punto_cruz' && (
+                    <motion.div
+                      layoutId="activeTabIndicator"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF0033] shadow-[0_0_8px_rgba(255,0,51,0.8)]"
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                </button>
+              )}
 
-              <button
-                onClick={() => setActiveTab('patrones')}
-                className={`text-xs sm:text-sm tracking-widest font-mono uppercase pb-3 transition-all relative whitespace-nowrap ${
-                  activeTab === 'patrones'
-                    ? 'text-white font-medium'
-                    : 'text-neutral-500 hover:text-neutral-300'
-                }`}
-              >
-                [ PATRONES PDF ({patronesBase.length}) ]
-                {activeTab === 'patrones' && (
-                  <motion.div
-                    layoutId="activeTabIndicator"
-                    className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF0033] shadow-[0_0_8px_rgba(255,0,51,0.8)]"
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                  />
-                )}
-              </button>
+              {patronesBase.length > 0 && (
+                <button
+                  onClick={() => setActiveTab('patrones')}
+                  className={`text-xs sm:text-sm tracking-widest font-mono uppercase pb-3 min-h-[44px] flex items-center transition-all relative whitespace-nowrap ${
+                    activeTab === 'patrones'
+                      ? 'text-white font-medium'
+                      : 'text-neutral-500 hover:text-neutral-300'
+                  }`}
+                >
+                  [ PATRONES PDF ({patronesBase.length}) ]
+                  {activeTab === 'patrones' && (
+                    <motion.div
+                      layoutId="activeTabIndicator"
+                      className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#FF0033] shadow-[0_0_8px_rgba(255,0,51,0.8)]"
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                </button>
+              )}
             </nav>
 
             {/* Subtitle / Telemetry */}
@@ -319,19 +326,19 @@ export const ShopPage = ({ onSelectProduct }) => {
           <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 flex-grow">
             
             {/* Inline Search */}
-            <div className="relative min-w-[180px] max-w-[240px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[180px] sm:max-w-[240px]">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="BUSCAR ARCHIVO..."
-                className="w-full bg-[#141414] border border-neutral-800 focus:border-neutral-500 text-neutral-200 placeholder:text-neutral-600 text-[11px] px-2.5 py-1.5 pl-7 outline-none transition-colors"
+                className="w-full bg-[#141414] border border-neutral-800 focus:border-neutral-500 text-neutral-200 placeholder:text-neutral-600 text-base sm:text-xs min-h-[44px] px-3 py-2 pl-9 outline-none transition-colors"
               />
-              <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2 top-2 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1.5 text-neutral-500 hover:text-white"
+                  className="w-11 h-11 flex items-center justify-center absolute right-0 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -346,7 +353,7 @@ export const ShopPage = ({ onSelectProduct }) => {
                   <select
                     value={seriesFilter}
                     onChange={(e) => setSeriesFilter(e.target.value)}
-                    className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-[11px] px-3 py-1.5 pr-7 outline-none cursor-pointer transition-colors uppercase"
+                    className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-base sm:text-xs min-h-[44px] px-3 py-2 pr-8 outline-none cursor-pointer transition-colors uppercase"
                   >
                     <option value="ALL">Categoría: Todas</option>
                     <option value="Alley Kats">Alley Kats</option>
@@ -355,7 +362,7 @@ export const ShopPage = ({ onSelectProduct }) => {
                     <option value="Beasts">Beasts</option>
                     <option value="Rogues">Rogues</option>
                   </select>
-                  <ChevronDown className="w-3 h-3 text-neutral-500 absolute right-2 top-2.5 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
                 {/* Size Dropdown */}
@@ -363,14 +370,14 @@ export const ShopPage = ({ onSelectProduct }) => {
                   <select
                     value={sizeFilter}
                     onChange={(e) => setSizeFilter(e.target.value)}
-                    className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-[11px] px-3 py-1.5 pr-7 outline-none cursor-pointer transition-colors uppercase"
+                    className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-base sm:text-xs min-h-[44px] px-3 py-2 pr-8 outline-none cursor-pointer transition-colors uppercase"
                   >
                     <option value="ALL">Tamaño: Todos</option>
                     <option value="SML">SML (Pocket)</option>
                     <option value="MED">MED (Stand)</option>
                     <option value="LRG">LRG (Large)</option>
                   </select>
-                  <ChevronDown className="w-3 h-3 text-neutral-500 absolute right-2 top-2.5 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
 
                 {/* Availability Dropdown */}
@@ -378,13 +385,13 @@ export const ShopPage = ({ onSelectProduct }) => {
                   <select
                     value={availabilityFilter}
                     onChange={(e) => setAvailabilityFilter(e.target.value)}
-                    className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-[11px] px-3 py-1.5 pr-7 outline-none cursor-pointer transition-colors uppercase"
+                    className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-base sm:text-xs min-h-[44px] px-3 py-2 pr-8 outline-none cursor-pointer transition-colors uppercase"
                   >
                     <option value="ALL">Estado: Todos</option>
                     <option value="IN_STOCK">En Stock</option>
                     <option value="LIMITED">Edición Limitada</option>
                   </select>
-                  <ChevronDown className="w-3 h-3 text-neutral-500 absolute right-2 top-2.5 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               </>
             )}
@@ -394,21 +401,21 @@ export const ShopPage = ({ onSelectProduct }) => {
               <select
                 value={priceFilter}
                 onChange={(e) => setPriceFilter(e.target.value)}
-                className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-[11px] px-3 py-1.5 pr-7 outline-none cursor-pointer transition-colors uppercase"
+                className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-base sm:text-xs min-h-[44px] px-3 py-2 pr-8 outline-none cursor-pointer transition-colors uppercase"
               >
                 <option value="ALL">Precio: Todos</option>
                 <option value="UNDER_50">&lt; $50.000 COP</option>
                 <option value="50_100">$50.000 - $100.000 COP</option>
                 <option value="OVER_100">&gt; $100.000 COP</option>
               </select>
-              <ChevronDown className="w-3 h-3 text-neutral-500 absolute right-2 top-2.5 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
             {/* Clear Filters Button */}
             {hasActiveFilters && (
               <button
                 onClick={resetFilters}
-                className="text-[11px] text-neutral-400 hover:text-[#FF0033] underline px-2 py-1 transition-colors"
+                className="text-xs text-neutral-400 hover:text-[#FF0033] underline px-2 min-h-[44px] flex items-center transition-colors"
               >
                 LIMPIAR
               </button>
@@ -427,14 +434,14 @@ export const ShopPage = ({ onSelectProduct }) => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-[11px] px-3 py-1.5 pr-7 outline-none cursor-pointer transition-colors uppercase"
+                className="appearance-none bg-[#141414] border border-neutral-800 hover:border-neutral-700 text-neutral-300 text-base sm:text-xs min-h-[44px] px-3 py-2 pr-8 outline-none cursor-pointer transition-colors uppercase"
               >
                 <option value="featured">ORDENAR: DESTACADOS</option>
                 <option value="price_asc">PRECIO: MENOR A MAYOR</option>
                 <option value="price_desc">PRECIO: MAYOR A MENOR</option>
                 <option value="name_asc">NOMBRE: A - Z</option>
               </select>
-              <ChevronDown className="w-3 h-3 text-neutral-500 absolute right-2 top-2.5 pointer-events-none" />
+              <ChevronDown className="w-3.5 h-3.5 text-neutral-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
         </div>
@@ -522,18 +529,18 @@ export const ShopPage = ({ onSelectProduct }) => {
                         </span>
                       </div>
 
-                      {/* Action Bar on Hover */}
-                      <div className="absolute inset-x-2 bottom-2 z-20 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      {/* Action Bar: visible on touch devices, hover on desktop */}
+                      <div className="absolute inset-x-2 bottom-2 z-20 flex flex-col gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
                         <button
                           onClick={(e) => handleDownload(e, item)}
-                          className="w-full py-2 bg-[#FF0033] hover:bg-red-700 text-white text-[11px] font-mono uppercase tracking-widest font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-lg"
+                          className="w-full min-h-[40px] py-2 bg-[#FF0033] hover:bg-red-700 text-white text-xs sm:text-[11px] font-mono uppercase tracking-widest font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-lg active:scale-95"
                         >
                           <Download className="w-3.5 h-3.5" />
                           <span>DESCARGAR PDF GRÁFICO</span>
                         </button>
                         <button
                           onClick={(e) => handleAddKit(e, item, false)}
-                          className="w-full py-1.5 bg-neutral-900/95 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-[10px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
+                          className="w-full min-h-[38px] py-1.5 bg-neutral-900/95 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs sm:text-[10px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 active:scale-95"
                         >
                           <ShoppingBag className="w-3 h-3 text-[#FF0033]" />
                           <span>+ KIT CON TELA ({formatCOP(item.kitPrice)})</span>
@@ -563,7 +570,7 @@ export const ShopPage = ({ onSelectProduct }) => {
                             <span className="text-[#FF0033] flex items-center">
                               ★ <strong className="text-neutral-300 ml-0.5">{item.rating.toFixed(1)}</strong>
                             </span>
-                            <span className="text-neutral-600">({item.reviewsCount || 0} reviews)</span>
+                            <span className="text-neutral-600">({item.reviewsCount || 0} valoraciones)</span>
                           </div>
                         )}
                       </div>
@@ -639,18 +646,18 @@ export const ShopPage = ({ onSelectProduct }) => {
                         </span>
                       </div>
 
-                      {/* Action Bar on Hover */}
-                      <div className="absolute inset-x-2 bottom-2 z-20 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      {/* Action Bar: visible on touch devices, hover on desktop */}
+                      <div className="absolute inset-x-2 bottom-2 z-20 flex flex-col gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200">
                         <button
                           onClick={(e) => handleDownload(e, item)}
-                          className="w-full py-2 bg-[#FF0033] hover:bg-red-700 text-white text-[11px] font-mono uppercase tracking-widest font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-lg"
+                          className="w-full min-h-[40px] py-2 bg-[#FF0033] hover:bg-red-700 text-white text-xs sm:text-[11px] font-mono uppercase tracking-widest font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-lg active:scale-95"
                         >
                           <Download className="w-3.5 h-3.5" />
                           <span>DESCARGAR GUÍA PDF</span>
                         </button>
                         <button
                           onClick={(e) => handleAddKit(e, item, true)}
-                          className="w-full py-1.5 bg-neutral-900/95 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-[10px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5"
+                          className="w-full min-h-[38px] py-1.5 bg-neutral-900/95 hover:bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs sm:text-[10px] font-mono uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 active:scale-95"
                         >
                           <ShoppingBag className="w-3 h-3 text-[#FF0033]" />
                           <span>+ BUNDLE CON LANA ({formatCOP(item.bundlePrice)})</span>
@@ -680,7 +687,7 @@ export const ShopPage = ({ onSelectProduct }) => {
                             <span className="text-[#FF0033] flex items-center">
                               ★ <strong className="text-neutral-300 ml-0.5">{item.rating.toFixed(1)}</strong>
                             </span>
-                            <span className="text-neutral-600">({item.reviewsCount || 0} reviews)</span>
+                            <span className="text-neutral-600">({item.reviewsCount || 0} valoraciones)</span>
                           </div>
                         )}
                       </div>

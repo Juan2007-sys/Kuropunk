@@ -35,7 +35,7 @@ export class ReviewsService {
       author: createReviewDto.author,
       rating: createReviewDto.rating,
       comment: createReviewDto.comment,
-      verifiedBuyer: createReviewDto.verifiedBuyer !== undefined ? createReviewDto.verifiedBuyer : true,
+      verifiedBuyer: false,
     });
 
     const savedReview = await this.reviewRepo.save(review);

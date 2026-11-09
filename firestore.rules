@@ -26,9 +26,10 @@ service cloud.firestore {
 
     // 2. Colección de Pedidos (Órdenes contraentrega)
     match /orders/{orderId} {
-      // Cualquier cliente (invitado o autenticado) puede registrar un pedido contraentrega válido
+      // Cualquier cliente (invitado o autenticado) puede registrar un pedido contraentrega válido únicamente en estado inicial 'placed'
       allow create: if request.resource.data.items.size() > 0 
-                    && (request.resource.data.totalAmount > 0 || request.resource.data.total > 0);
+                    && (request.resource.data.totalAmount > 0 || request.resource.data.total > 0)
+                    && request.resource.data.status == 'placed';
 
       // Lectura protegida: Solo el dueño del pedido (por userId) o el Administrador
       allow read: if isAdmin() || (
@@ -39,10 +40,20 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // 3. Colección de Usuarios y Perfiles
+    // 3. Colección de Usuarios y Perfiles (Blindado contra Escalada de Privilegios / Role Tampering)
     match /users/{userId} {
-      // Cada usuario solo puede ver y editar su propio perfil
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      // Al registrarse, un usuario normal SOLO puede crearse con rol 'customer'
+      allow create: if isAdmin() || (
+        isOwner(userId) &&
+        (!('role' in request.resource.data) || request.resource.data.role == 'customer')
+      );
+      // Al actualizar su perfil, un usuario NO puede alterar su propio campo 'role'
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        request.resource.data.role == resource.data.role
+      );
+      allow delete: if isAdmin();
     }
 
     // 4. Colección de Reseñas / Reviews

@@ -18,9 +18,10 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
   const dollRef = useRef(null);
   const shadowRef = useRef(null);
 
-  // Lista de piezas destacadas para el Hero
+  // Lista de piezas destacadas para el Hero (solo activas con fotos reales)
   const [featuredProducts, setFeaturedProducts] = useState(() => {
-    return fallbackCatalog.filter((p) => p.isFeatured || p.isHero).slice(0, 3);
+    const active = fallbackCatalog.filter((p) => p.isActive !== false && (p.isFeatured || p.isHero));
+    return active.length > 0 ? active.slice(0, 3) : fallbackCatalog.filter((p) => p.isActive !== false).slice(0, 3);
   });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -232,7 +233,7 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      className="relative z-10 w-full min-h-[460px] sm:min-h-[520px] flex flex-col items-center justify-center select-none touch-pan-y"
+      className="relative z-10 w-full min-h-[440px] sm:min-h-[520px] flex flex-col items-center justify-center select-none touch-pan-y overflow-x-clip"
       style={{ perspective: '1200px' }}
     >
       {/* Luz volumétrica de fondo (Glow carmesí) */}
@@ -291,23 +292,23 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
         </div>
       </div>
 
-      {/* Controles sutiles de navegación entre piezas del showcase */}
+      {/* Controles accesibles de navegación entre piezas del showcase */}
       {featuredProducts.length > 1 && (
-        <div className="flex items-center gap-3 mt-6 z-20">
+        <div className="flex items-center gap-2 sm:gap-3 mt-4 sm:mt-6 z-20">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setCurrentIndex((prev) => (prev - 1 + featuredProducts.length) % featuredProducts.length);
             }}
-            className="p-1.5 bg-[#1c1a1a]/80 hover:bg-[#e0141f] text-neutral-400 hover:text-white border border-[#5e3f3c] transition-colors rounded-none"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-[#1c1a1a]/90 hover:bg-[#e0141f] text-neutral-400 hover:text-white border border-[#5e3f3c] transition-colors"
             aria-label="Pieza anterior"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
-          {/* Dots indicadores */}
-          <div className="flex items-center gap-1.5">
+          {/* Dots indicadores con área táctil ampliada (min-h-[44px]) */}
+          <div className="flex items-center gap-1">
             {featuredProducts.map((p, idx) => (
               <button
                 key={p.id || idx}
@@ -316,13 +317,17 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
                   e.stopPropagation();
                   setCurrentIndex(idx);
                 }}
-                className={`h-1.5 transition-all duration-300 ${
-                  currentIndex === idx
-                    ? 'w-6 bg-[#e0141f]'
-                    : 'w-2 bg-neutral-700 hover:bg-neutral-500'
-                }`}
+                className="min-w-[32px] sm:min-w-[40px] min-h-[44px] flex items-center justify-center group"
                 aria-label={`Ver pieza ${idx + 1}`}
-              />
+              >
+                <span
+                  className={`h-1.5 transition-all duration-300 block ${
+                    currentIndex === idx
+                      ? 'w-6 bg-[#e0141f]'
+                      : 'w-2 bg-neutral-700 group-hover:bg-neutral-500'
+                  }`}
+                />
+              </button>
             ))}
           </div>
 
@@ -332,10 +337,10 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
               e.stopPropagation();
               setCurrentIndex((prev) => (prev + 1) % featuredProducts.length);
             }}
-            className="p-1.5 bg-[#1c1a1a]/80 hover:bg-[#e0141f] text-neutral-400 hover:text-white border border-[#5e3f3c] transition-colors rounded-none"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center bg-[#1c1a1a]/90 hover:bg-[#e0141f] text-neutral-400 hover:text-white border border-[#5e3f3c] transition-colors"
             aria-label="Siguiente pieza"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}

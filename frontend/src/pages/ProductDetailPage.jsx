@@ -59,35 +59,23 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   if (!product) {
-    product = PRODUCTS[0];
+    product = PRODUCTS.find((p) => p.isActive !== false) || PRODUCTS[0];
   }
 
-  const isSoldOut = product.badge === 'SOLD OUT' || product.stock === 0;
+  const isSoldOut = product.badge === 'SOLD OUT' || product.badge === 'AGOTADO' || product.badgeType === 'sold-out' || product.stock === 0;
   const isDigitalPattern = product.type === 'patron' || product.type === 'punto_cruz' || product.category === 'Punto Cruz';
   const isCrossStitch = product.technique === 'punto_cruz' || product.category === 'Punto Cruz' || product.type === 'punto_cruz';
-  const moreDrops = PRODUCTS.filter((p) => p.id !== product.id).slice(0, 4);
+  const moreDrops = PRODUCTS.filter((p) => p.isActive !== false && p.id !== product.id).slice(0, 4);
   const isWishlisted = isInWishlist(product.id);
 
-  // Configurador Táctico Loadout / Kit Builder
-  const [loadoutTier, setLoadoutTier] = useState(
-    isDigitalPattern ? 'digital' : 'finished'
-  );
-
-  const effectivePrice = React.useMemo(() => {
-    if (loadoutTier === 'digital') {
-      return product.price < 50000 ? product.price : 25000;
-    }
-    if (loadoutTier === 'kit') {
-      return Math.round(product.price * 0.65);
-    }
-    return product.price;
-  }, [loadoutTier, product.price]);
+  // Modo Coleccionable Físico (única opción activa por solicitud de tienda)
+  const loadoutTier = 'finished';
+  const effectivePrice = product.price;
 
   useEffect(() => {
     if (product?.image) {
       setActiveImage(product.image);
     }
-    setLoadoutTier(isDigitalPattern ? 'digital' : 'finished');
     // Load reviews
     setIsLoadingReviews(true);
     getProductReviews(product.id).then((res) => {
@@ -97,19 +85,14 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
   }, [product]);
 
   const handleAddToCart = () => {
-    if (isSoldOut && loadoutTier === 'finished') {
+    if (isSoldOut) {
       setIsRestockOpen(true);
       return;
     }
-    const tierLabels = {
-      finished: 'Coleccionable Terminado (Hecho a mano)',
-      kit: 'Kit DIY Materiales + Guía',
-      digital: 'Patrón Digital PDF'
-    };
     addToCart(
-      { ...product, price: effectivePrice },
+      { ...product, price: product.price },
       quantity,
-      { tier: loadoutTier, tierLabel: tierLabels[loadoutTier] }
+      { tier: 'finished', tierLabel: 'Coleccionable Terminado (Hecho a mano)' }
     );
   };
 
@@ -166,7 +149,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
   ];
 
   return (
-    <div className="w-full pt-4 pb-24 bg-[#080808] relative min-h-screen text-neutral-200">
+    <div className="w-full pt-4 pb-32 sm:pb-24 bg-[#080808] relative min-h-screen text-neutral-200">
       
       {/* Lightbox Modal for HD Inspection */}
       <Lightbox
@@ -215,10 +198,14 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
             <div className="absolute top-4 left-4 z-20 flex flex-col gap-1.5">
               {product.badge && (
                 <span className={`text-[10px] font-mono tracking-widest uppercase px-2.5 py-1 font-bold ${
-                  product.badge === 'LIMITED DROP' || product.badge === 'FLAGSHIP'
+                  product.badge === 'LIMITED DROP' || product.badge === 'EDICIÓN LIMITADA' || product.badge === 'FLAGSHIP'
                     ? 'bg-[#FF0033] text-white shadow-lg'
-                    : product.badge === 'SOLD OUT'
+                    : product.badge === 'SOLD OUT' || product.badge === 'AGOTADO' || product.badgeType === 'sold-out'
                     ? 'bg-neutral-900 text-[#FF0033] border border-[#FF0033]'
+                    : product.badge === 'NEW' || product.badge === 'NUEVO'
+                    ? 'bg-white text-black font-bold'
+                    : product.badge === 'HOT' || product.badge === 'DESTACADO' || product.badge === 'LAST ONE' || product.badge === 'ÚLTIMA UNIDAD'
+                    ? 'bg-amber-600 text-white font-bold'
                     : 'bg-neutral-900 text-neutral-200 border border-neutral-700'
                 }`}>
                   {product.badge} {product.badgeVol ? `// ${product.badgeVol}` : ''}
@@ -308,78 +295,26 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                   {formatCOP(product.originalPrice)}
                 </span>
               )}
-              <span className="font-mono text-xs text-neutral-500 ml-auto">
-                {loadoutTier === 'digital' ? 'DESCARGA INMEDIATA' : 'PAGO CONTRAENTREGA DISPONIBLE'}
+              <span className="font-mono text-xs text-neutral-400 ml-auto">
+                PAGO CONTRAENTREGA DISPONIBLE
               </span>
             </div>
 
             {/* Cash on Delivery Trust Tag */}
-            {loadoutTier !== 'digital' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-[#161414] border-l-2 border-[#FF0033] text-xs font-mono text-neutral-300">
-                <span className="text-[#FF0033] font-bold">✓ PAGO AL RECIBIR:</span>
-                <span>Pagas en efectivo, Nequi o Daviplata en mano al recibir tu paquete.</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#161414] border-l-2 border-[#FF0033] text-xs font-mono text-neutral-300">
+              <span className="text-[#FF0033] font-bold">✓ PAGO AL RECIBIR:</span>
+              <span>Pagas en efectivo, Nequi o Daviplata en mano al recibir tu paquete.</span>
+            </div>
           </div>
 
-          {/* CONFIGURADOR TÁCTICO // LOADOUT BUILDER */}
-          <div className="space-y-2 bg-[#121010] border border-neutral-800 p-4 shadow-xl">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-[#ffb4ab] font-bold uppercase flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#e0141f]" /> CONFIGURACIÓN TÁCTICA // LOADOUT:
-              </span>
-              <span className="text-neutral-500 text-[10px]">SELECCIONA MODO</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 font-mono text-xs">
-              <button
-                type="button"
-                onClick={() => setLoadoutTier('digital')}
-                className={`p-2.5 border text-left flex flex-col justify-between transition-all ${
-                  loadoutTier === 'digital'
-                    ? 'bg-[#221818] border-[#e0141f] text-white shadow-md'
-                    : 'bg-[#161414] border-neutral-800 text-neutral-400 hover:border-neutral-600'
-                }`}
-              >
-                <span className="font-bold text-[11px] block">1. PATRÓN DIGITAL</span>
-                <span className="text-[10px] text-neutral-400">Blueprint PDF vectorial</span>
-                <span className="text-xs font-bold text-[#ffb4ab] mt-1">
-                  {formatCOP(product.price < 50000 ? product.price : 25000)}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLoadoutTier('kit')}
-                className={`p-2.5 border text-left flex flex-col justify-between transition-all ${
-                  loadoutTier === 'kit'
-                    ? 'bg-[#221818] border-[#e0141f] text-white shadow-md'
-                    : 'bg-[#161414] border-neutral-800 text-neutral-400 hover:border-neutral-600'
-                }`}
-              >
-                <span className="font-bold text-[11px] block">2. LOADOUT / KIT DIY</span>
-                <span className="text-[10px] text-neutral-400">Lanas + Aguja + Ojos</span>
-                <span className="text-xs font-bold text-[#ffb4ab] mt-1">
-                  {formatCOP(Math.round(product.price * 0.65))}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLoadoutTier('finished')}
-                className={`p-2.5 border text-left flex flex-col justify-between transition-all ${
-                  loadoutTier === 'finished'
-                    ? 'bg-[#221818] border-[#e0141f] text-white shadow-md'
-                    : 'bg-[#161414] border-neutral-800 text-neutral-400 hover:border-neutral-600'
-                }`}
-              >
-                <span className="font-bold text-[11px] block">3. COLECCIONABLE</span>
-                <span className="text-[10px] text-neutral-400">Pieza física terminada</span>
-                <span className="text-xs font-bold text-[#ffb4ab] mt-1">
-                  {formatCOP(product.price)}
-                </span>
-              </button>
-            </div>
+          {/* Badge Informativo: Coleccionable Artesanal */}
+          <div className="flex items-center justify-between p-3 bg-[#121010] border border-neutral-800 text-xs font-mono shadow-md">
+            <span className="text-[#ffb4ab] font-bold uppercase flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#e0141f]" /> ARTEFACTO ARTESANAL // EDICIÓN FÍSICA
+            </span>
+            <span className="text-neutral-300 text-[11px] font-bold bg-neutral-900 px-2.5 py-1 border border-neutral-700">
+              COLECCIONABLE TERMINADO
+            </span>
           </div>
 
           {/* Dossier Specifications Box */}
@@ -450,17 +385,21 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                 <span className="font-mono text-xs text-neutral-400 uppercase">Cantidad</span>
                 <div className="flex items-center border border-neutral-700 bg-[#141414]">
                   <button
+                    type="button"
                     onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    className="px-3 py-1 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800"
+                    aria-label="Disminuir cantidad"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-base text-neutral-200 hover:text-white hover:bg-neutral-800 active:scale-95 transition-all"
                   >
                     -
                   </button>
-                  <span className="px-4 py-1 font-mono text-sm font-bold text-white">
+                  <span className="w-11 h-11 flex items-center justify-center font-mono text-sm font-bold text-white">
                     {quantity}
                   </span>
                   <button
+                    type="button"
                     onClick={() => setQuantity((q) => Math.min(product.stock || 10, q + 1))}
-                    className="px-3 py-1 text-sm text-neutral-200 hover:text-white hover:bg-neutral-800"
+                    aria-label="Aumentar cantidad"
+                    className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-base text-neutral-200 hover:text-white hover:bg-neutral-800 active:scale-95 transition-all"
                   >
                     +
                   </button>
@@ -469,15 +408,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
             )}
 
             {/* Primary Action Button */}
-            {loadoutTier === 'digital' ? (
-              <button
-                onClick={handleDownload}
-                className="w-full py-4 px-6 font-mono text-xs sm:text-sm font-bold uppercase tracking-widest bg-[#FF0033] hover:bg-red-700 text-white transition-all flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" />
-                <span>DESCARGAR GUÍA PDF AHORA</span>
-              </button>
-            ) : (isSoldOut && loadoutTier === 'finished') ? (
+            {isSoldOut ? (
               <button
                 onClick={() => setIsRestockOpen(true)}
                 className="w-full py-4 px-6 font-mono text-xs sm:text-sm font-bold uppercase tracking-widest bg-[#1a1818] border-2 border-[#e0141f] text-[#ffb4ab] hover:bg-[#e0141f] hover:text-white transition-all flex items-center justify-center gap-2.5 shadow-lg"
@@ -490,14 +421,15 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                 onClick={handleAddToCart}
                 className="w-full py-4 px-6 font-mono text-xs sm:text-sm font-bold uppercase tracking-widest bg-[#FF0033] hover:bg-red-700 text-white transition-all flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.98]"
               >
-                <span>AGREGAR AL CARRITO ({loadoutTier === 'kit' ? 'KIT DIY' : 'TERMINADO'})</span>
+                <span>AGREGAR AL CARRITO</span>
                 <ShoppingCart className="w-4 h-4" />
               </button>
             )}
 
             <button
+              type="button"
               onClick={() => toggleWishlist(product.id, product.title)}
-              className={`w-full py-2.5 px-6 font-mono text-xs uppercase tracking-wider border transition-colors flex justify-center items-center gap-2 ${
+              className={`w-full min-h-[44px] py-2.5 px-6 font-mono text-xs uppercase tracking-wider border transition-colors flex justify-center items-center gap-2 ${
                 isWishlisted
                   ? 'bg-white text-black border-white font-bold'
                   : 'bg-transparent text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-600'
@@ -522,8 +454,10 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                     <Bell className="w-3.5 h-3.5 text-[#e0141f]" /> Radar de Restock Activado
                   </span>
                   <button
+                    type="button"
                     onClick={() => setIsRestockOpen(false)}
-                    className="text-xs text-neutral-500 hover:text-white"
+                    aria-label="Cerrar radar de restock"
+                    className="w-11 h-11 -mr-2 -mt-2 flex items-center justify-center text-sm text-neutral-400 hover:text-white transition-colors"
                   >
                     ✕
                   </button>
@@ -531,18 +465,18 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                 <p className="text-xs text-neutral-400 mb-3 font-mono">
                   Te enviaremos una señal encriptada antes de que este lote se vuelva a liberar al público.
                 </p>
-                <form onSubmit={handleRestockSubmit} className="flex gap-2">
+                <form onSubmit={handleRestockSubmit} className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="email"
                     required
                     placeholder="tu-correo@operativo.com"
                     value={restockEmail}
                     onChange={(e) => setRestockEmail(e.target.value)}
-                    className="flex-grow bg-[#0c0c0c] border border-neutral-700 px-3 py-2 text-xs font-mono text-white outline-none focus:border-[#e0141f]"
+                    className="flex-grow bg-[#0c0c0c] border border-neutral-700 px-3.5 py-2.5 text-base sm:text-xs min-h-[44px] font-mono text-white outline-none focus:border-[#e0141f]"
                   />
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-[#e0141f] text-white font-mono text-xs uppercase font-bold hover:bg-red-700"
+                    className="min-h-[44px] px-5 py-2.5 bg-[#e0141f] text-white font-mono text-xs uppercase font-bold hover:bg-red-700 active:scale-95 transition-all"
                   >
                     Activar
                   </button>
@@ -642,7 +576,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                   placeholder="Operative_88"
                   value={newReviewAuthor}
                   onChange={(e) => setNewReviewAuthor(e.target.value)}
-                  className="w-full bg-[#141414] border border-neutral-800 px-3 py-2 text-xs font-mono text-white outline-none focus:border-[#e0141f]"
+                  className="w-full bg-[#141414] border border-neutral-800 px-3.5 py-2.5 text-base sm:text-xs min-h-[44px] font-mono text-white outline-none focus:border-[#e0141f] transition-colors"
                 />
               </div>
 
@@ -656,10 +590,11 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                       type="button"
                       key={star}
                       onClick={() => setNewReviewRating(star)}
-                      className={`px-3 py-1 font-mono text-xs border ${
+                      aria-label={`${star} estrella${star > 1 ? 's' : ''}`}
+                      className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center font-mono text-sm border transition-all active:scale-95 ${
                         newReviewRating >= star
                           ? 'bg-[#e0141f] text-white border-[#e0141f]'
-                          : 'bg-[#141414] text-neutral-500 border-neutral-800'
+                          : 'bg-[#141414] text-neutral-500 border-neutral-800 hover:border-neutral-700'
                       }`}
                     >
                       ★ {star}
@@ -678,14 +613,14 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                   placeholder="Detalla la calidad del crochet o gráfico..."
                   value={newReviewComment}
                   onChange={(e) => setNewReviewComment(e.target.value)}
-                  className="w-full bg-[#141414] border border-neutral-800 px-3 py-2 text-xs font-body-md text-white outline-none focus:border-[#e0141f] resize-none"
+                  className="w-full bg-[#141414] border border-neutral-800 px-3.5 py-2.5 text-base sm:text-xs min-h-[96px] font-body-md text-white outline-none focus:border-[#e0141f] resize-none transition-colors"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmittingReview}
-                className="w-full py-3 bg-[#ffb4ab] hover:bg-[#e0141f] text-[#690006] hover:text-white font-mono text-xs uppercase font-bold tracking-wider transition-colors flex items-center justify-center gap-2"
+                className="w-full min-h-[44px] py-3 bg-[#ffb4ab] hover:bg-[#e0141f] text-[#690006] hover:text-white font-mono text-xs uppercase font-bold tracking-wider transition-colors flex items-center justify-center gap-2 active:scale-95"
               >
                 <span>{isSubmittingReview ? 'TRANSMITIENDO...' : 'PUBLICAR RESEÑA'}</span>
                 <Send className="w-3.5 h-3.5" />
@@ -762,6 +697,26 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
         onClose={() => setIsAuthenticityOpen(false)}
         initialSerial={product.sku || 'RX-00-042'}
       />
+
+      {/* Floating Mobile Bottom Action Bar (Safe Area & Thumb Friendly) */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e0e]/95 backdrop-blur-md border-t border-neutral-800 p-3 sm:hidden pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 shadow-[0_-4px_25px_rgba(0,0,0,0.85)]">
+        <div className="flex flex-col min-w-0 pr-2">
+          <span className="text-[10px] font-mono text-neutral-400 uppercase truncate">
+            {product.title}
+          </span>
+          <span className="text-base font-bold text-white font-mono tracking-tight">
+            {formatCOP(effectivePrice)}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          className="shrink-0 min-h-[44px] px-5 py-2.5 bg-[#FF0033] hover:bg-red-700 text-white font-mono text-xs uppercase font-bold tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+        >
+          <ShoppingCart className="w-3.5 h-3.5" />
+          <span>AGREGAR</span>
+        </button>
+      </div>
 
     </div>
   );

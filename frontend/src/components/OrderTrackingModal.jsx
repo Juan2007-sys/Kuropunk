@@ -94,31 +94,20 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  // Determine current step index
+  // Determine current step index across both Firestore and Backend state strings
   const getStepIndex = (status) => {
-    switch (status) {
-      case 'EN_TALLER':
-      case 'PREPARING':
-        return 1;
-      case 'EN_RUTA':
-      case 'DISPATCHED':
-      case 'EN_CAMINO':
-        return 2;
-      case 'DELIVERED':
-      case 'ENTREGADO':
-        return 3;
-      case 'CONFIRMED':
-      case 'PENDING':
-      default:
-        return 0;
-    }
+    const s = String(status || '').toLowerCase();
+    if (s.includes('deliver') || s.includes('entreg')) return 3;
+    if (s.includes('ship') || s.includes('ruta') || s.includes('camino') || s.includes('despach')) return 2;
+    if (s.includes('product') || s.includes('taller') || s.includes('prepar') || s.includes('confecc')) return 1;
+    return 0;
   };
 
   const currentStepIdx = order ? getStepIndex(order.status) : 0;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4">
+      <div data-lenis-prevent="true" className="fixed inset-0 z-50 overflow-y-auto flex items-start sm:items-center justify-center p-2.5 sm:p-4 overscroll-contain">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -130,10 +119,11 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
 
         {/* Modal Window */}
         <motion.div
+          data-lenis-prevent="true"
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          className="relative w-full max-w-2xl bg-[#171515] brutalist-border staple-corner shadow-2xl p-6 sm:p-8 text-[#e6e1e1] z-10 space-y-6"
+          className="relative w-full max-w-2xl bg-[#171515] brutalist-border staple-corner shadow-2xl p-4 sm:p-8 text-[#e6e1e1] z-10 space-y-5 my-auto max-h-[92dvh] overflow-y-auto custom-scrollbar"
         >
           {/* Header */}
           <div className="flex items-start justify-between border-b border-[#5e3f3c] pb-4">
@@ -141,13 +131,14 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
               <span className="font-mono text-xs text-[#25D366] font-bold uppercase tracking-widest block">
                 [ RADAR DE DESPACHO EN VIVO ]
               </span>
-              <h2 className="font-stencil text-2xl sm:text-3xl uppercase text-white tracking-wide">
+              <h2 className="font-stencil text-xl sm:text-3xl uppercase text-white tracking-wide">
                 Rastreo de Pedido Contraentrega
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white border border-[#5e3f3c] hover:border-[#e0141f] transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-neutral-400 hover:text-white border border-[#5e3f3c] hover:border-[#e0141f] transition-colors shrink-0"
+              aria-label="Cerrar modal de rastreo"
             >
               <X className="w-5 h-5" />
             </button>
@@ -168,13 +159,13 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Número de orden (ej. VS-592812) o tu Celular..."
-                className="w-full bg-[#0d0c0c] border border-[#5e3f3c] pl-10 pr-4 py-3 text-xs font-mono text-white outline-none focus:border-[#25D366] transition-colors"
+                className="w-full bg-[#0d0c0c] border border-[#5e3f3c] pl-10 pr-4 py-3 text-base sm:text-xs font-mono text-white outline-none focus:border-[#25D366] transition-colors min-h-[44px]"
               />
             </div>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-3 bg-[#e0141f] hover:bg-red-700 text-white font-mono text-xs uppercase font-bold tracking-wider transition-all"
+              className="min-h-[44px] px-6 py-3 bg-[#e0141f] hover:bg-red-700 text-white font-mono text-xs uppercase font-bold tracking-wider transition-all flex items-center justify-center shrink-0"
             >
               {isLoading ? 'Rastreando...' : 'Buscar Pedido'}
             </button>
@@ -278,10 +269,10 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                   href={generateWhatsAppTrackingUrl(order.id, order.phone)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20ba59] text-black font-headline-md text-lg uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.99]"
+                  className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20ba59] text-black font-headline-md text-sm sm:text-base md:text-lg uppercase tracking-wider font-bold transition-all flex items-center justify-center gap-2.5 shadow-lg active:scale-[0.99] text-center"
                 >
-                  <MessageSquare className="w-5 h-5 fill-black" />
-                  <span>Hablar con el Artesano por WhatsApp ({WHATSAPP_PHONE_DISPLAY})</span>
+                  <MessageSquare className="w-5 h-5 fill-black shrink-0" />
+                  <span>Hablar con el Artesano por WhatsApp</span>
                 </a>
               </div>
             </div>

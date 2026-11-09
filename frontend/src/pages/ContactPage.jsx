@@ -144,7 +144,7 @@ export const ContactPage = () => {
                 <label className="font-accent-tag text-xs text-[#ffb4ab] uppercase tracking-wider block">
                   Tipo de Solicitud / Transmisión
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
                     { id: 'commission', label: 'Comisión 1-de-1' },
                     { id: 'punto_cruz', label: 'Gráfico Personalizado' },
@@ -155,7 +155,7 @@ export const ContactPage = () => {
                       type="button"
                       key={type.id}
                       onClick={() => setFormData({ ...formData, type: type.id })}
-                      className={`py-2 px-3 text-left font-mono text-xs border transition-colors ${
+                      className={`min-h-[44px] py-2 px-3 text-left font-mono text-xs border flex items-center transition-colors active:scale-98 ${
                         formData.type === type.id
                           ? 'border-[#e0141f] bg-[#e0141f]/20 text-white font-bold'
                           : 'border-[#5e3f3c] bg-[#141313] text-neutral-400 hover:text-white'
@@ -178,7 +178,7 @@ export const ContactPage = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. StrayKat_09"
                   required
-                  className="w-full bg-[#141313] border-b-2 border-[#5e3f3c] focus:border-[#e0141f] outline-none font-body-md text-sm text-[#e6e1e1] py-2.5 px-3 transition-colors placeholder:text-[#5e3f3c]"
+                  className="w-full min-h-[44px] bg-[#141313] border-b-2 border-[#5e3f3c] focus:border-[#e0141f] outline-none font-body-md text-base sm:text-sm text-[#e6e1e1] py-2.5 px-3 transition-colors placeholder:text-[#5e3f3c]"
                 />
               </div>
 
@@ -193,7 +193,7 @@ export const ContactPage = () => {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="operative@underground.net"
                   required
-                  className="w-full bg-[#141313] border-b-2 border-[#5e3f3c] focus:border-[#e0141f] outline-none font-body-md text-sm text-[#e6e1e1] py-2.5 px-3 transition-colors placeholder:text-[#5e3f3c]"
+                  className="w-full min-h-[44px] bg-[#141313] border-b-2 border-[#5e3f3c] focus:border-[#e0141f] outline-none font-body-md text-base sm:text-sm text-[#e6e1e1] py-2.5 px-3 transition-colors placeholder:text-[#5e3f3c]"
                 />
               </div>
 
@@ -208,7 +208,7 @@ export const ContactPage = () => {
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   placeholder="Describe la pieza que deseas, colores deseados, medidas aproximadas o el SKU de referencia..."
                   required
-                  className="w-full bg-[#141313] border-b-2 border-[#5e3f3c] focus:border-[#e0141f] outline-none font-body-md text-sm text-[#e6e1e1] py-2.5 px-3 transition-colors placeholder:text-[#5e3f3c] resize-none"
+                  className="w-full min-h-[100px] bg-[#141313] border-b-2 border-[#5e3f3c] focus:border-[#e0141f] outline-none font-body-md text-base sm:text-sm text-[#e6e1e1] py-2.5 px-3 transition-colors placeholder:text-[#5e3f3c] resize-none"
                 ></textarea>
               </div>
 
@@ -216,7 +216,7 @@ export const ContactPage = () => {
               <button
                 type="submit"
                 disabled={isTransmitting}
-                className="mt-1 w-full bg-[#e0141f] text-[#fff4f3] font-stencil text-xl py-3.5 uppercase border-2 border-[#e0141f] hover:bg-[#141313] hover:text-[#ffb4ab] transition-all relative overflow-hidden group shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2"
+                className="mt-1 w-full min-h-[48px] bg-[#e0141f] text-[#fff4f3] font-stencil text-xl py-3.5 uppercase border-2 border-[#e0141f] hover:bg-[#141313] hover:text-[#ffb4ab] transition-all relative overflow-hidden group shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 active:scale-98"
               >
                 <span className="relative z-10">
                   {isTransmitting ? 'TRANSMITIENDO ENCRIPTACIÓN...' : 'Transmitir Señal'}

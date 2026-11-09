@@ -28,6 +28,27 @@
   }
 }
 
+/* Custom scrollbar class for modals and panels */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #5e3f3c #141313;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #141313;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #5e3f3c;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #e0141f;
+}
+
+
 /* Background noise and textures */
 .concrete-texture {
   background-color: #141313;

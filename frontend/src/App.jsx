@@ -24,7 +24,7 @@ function parseHashRoute() {
   if (!rawHash) return { view: 'home', productId: null };
 
   const [route, param] = rawHash.split('/');
-  if (route === 'product' && param) {
+  if ((route === 'product' || route === 'producto') && param) {
     return { view: 'product-detail', productId: decodeURIComponent(param) };
   }
   const validViews = ['home', 'shop', 'about', 'contact', 'checkout', 'my-orders', 'admin'];
@@ -139,12 +139,7 @@ export function AppContent() {
     };
   }, []);
 
-  // Strict RBAC Guard: If user logs out and currentView is admin, force redirect to home
-  useEffect(() => {
-    if (!isAdmin && currentView === 'admin') {
-      navigateTo('home', null, true);
-    }
-  }, [isAdmin, currentView, navigateTo]);
+  // RBAC Guard is handled gracefully by AdminGuard component at render time
 
   // Initialize Lenis Smooth Scrolling (solo en Desktop con puntero fino para evitar lag táctil)
   useEffect(() => {
@@ -155,7 +150,17 @@ export function AppContent() {
       duration: 1.1,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
       smoothWheel: true,
-      wheelMultiplier: 0.9
+      wheelMultiplier: 0.9,
+      prevent: (node) => {
+        return (
+          node.hasAttribute('data-lenis-prevent') ||
+          Boolean(
+            node.closest(
+              '[data-lenis-prevent], [role="dialog"], [role="listbox"], [cmdk-list], [cmdk-root], .overflow-y-auto, .overflow-auto'
+            )
+          )
+        );
+      }
     });
 
     let animationFrameId;
@@ -170,6 +175,30 @@ export function AppContent() {
       lenis.destroy();
     };
   }, []);
+
+  // Atajo global Ctrl+K / Cmd+K para abrir/cerrar buscador boveda
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Bloquear scroll de fondo cuando cualquier modal esté activo
+  const anyModalOpen = isCommandOpen || isTrackingOpen || isAuthOpen || isWorkshopHUDOpen || isAuthenticityOpen;
+  useEffect(() => {
+    if (anyModalOpen) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [anyModalOpen]);
 
   // Scroll to top when view changes
   useEffect(() => {

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { PRODUCTS } from '../data/products';
 
 const CartContext = createContext(null);
 
@@ -9,38 +10,44 @@ export const CartProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Sanitizar ítems legacy con precios en USD o shorthand (< 1000 COP)
-        return parsed.map(item => {
-          let price = Number(item.price);
-          if (price > 0 && price < 1000) {
-            price = price * 1000;
-          }
-          return {
-            ...item,
-            price: price || 145000
-          };
-        });
+        // Sanitizar ítems legacy con precios en USD o shorthand (< 1000 COP) y filtrar productos inactivos
+        return parsed
+          .filter(item => {
+            const found = PRODUCTS.find(p => p.id === item.id);
+            // Si el producto está en el catálogo y está desactivado, eliminarlo del carrito
+            if (found && found.isActive === false) return false;
+            // Si es un mock legacy desconocido, removerlo
+            if (!found) return false;
+            return true;
+          })
+          .map(item => {
+            let price = Number(item.price);
+            if (price > 0 && price < 1000) {
+              price = price * 1000;
+            }
+            return {
+              ...item,
+              price: price || 50000
+            };
+          });
       } catch (e) { console.error(e); }
     }
-    return [
-      {
-        id: "the-wanderer",
-        title: "The Wanderer // Flagship",
-        price: 145000,
-        color: "Asphalt",
-        quantity: 1,
-        image: "https://lh3.googleusercontent.com/aida-public/AB6AXuDOcXKo7gOBjP9ZlFxuVLSUyKqvrVSMOR3T4GQu3L1gJdI7keqGp4bmRraEi1rISe7iw2mEBtkwkvEkJLg5CZA2ziOSXiND7tI0DB-zDER3dqQDsJBK21ptyuOWVg9Lo02FTRwRqTpPCvha7EIyw1fgO1DYgfxscqUPuuwSymApqc6xfbzMN27yqEbR3uJ5x1d2RYT1UEwOwQOJjfqtHlCbhg799jVy85P7YOOhU5SRN1LepcqK06Zd"
-      }
-    ];
+    return [];
   });
 
   // Persistent Wishlist
   const [wishlist, setWishlist] = useState(() => {
     const saved = localStorage.getItem('vandal_stitch_wishlist');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.filter(id => {
+          const found = PRODUCTS.find(p => p.id === id);
+          return found && found.isActive !== false;
+        });
+      } catch (e) { console.error(e); }
     }
-    return ['the-wanderer'];
+    return [];
   });
 
   const [isCartOpen, setIsCartOpen] = useState(false);

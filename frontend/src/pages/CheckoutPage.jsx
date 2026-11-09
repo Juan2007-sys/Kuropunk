@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { submitOrder } from '../services/api';
@@ -36,6 +36,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
   const [agreed, setAgreed] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderConfirmed, setOrderConfirmed] = useState(null);
+  const submittingRef = useRef(false);
 
   const [customerInfo, setCustomerInfo] = useState({
     name: currentUser?.displayName || '',
@@ -69,89 +70,89 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
 
   const handleConfirmOrder = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-
-    if (cart.length === 0) {
-      showToast("TU CARRITO DE COMPRAS ESTÁ VACÍO", "warning");
-      return;
-    }
-    if (!customerInfo.name.trim()) {
-      showToast("POR FAVOR INGRESA TU NOMBRE COMPLETO", "warning");
-      return;
-    }
-    const cleanPhone = customerInfo.phone.replace(/\D/g, '');
-    if (cleanPhone.length < 7) {
-      showToast("POR FAVOR INGRESA UN CELULAR O WHATSAPP VÁLIDO", "warning");
-      return;
-    }
-    if (!customerInfo.address.trim()) {
-      showToast("POR FAVOR INGRESA TU DIRECCIÓN DE ENTREGA", "warning");
-      return;
-    }
-    if (!customerInfo.neighborhood.trim()) {
-      showToast("POR FAVOR INDICA EL BARRIO DE ENTREGA", "warning");
-      return;
-    }
-    if (!agreed) {
-      showToast("POR FAVOR CONFIRMA EL PAGO CONTRAENTREGA PARA CONTINUAR", "warning");
-      return;
-    }
-
-    setIsProcessing(true);
-
-    const emailFallback = currentUser?.email || `${cleanPhone}@cliente.kuropunk.com`;
-
-    const orderPayload = {
-      customerName: customerInfo.name.trim(),
-      email: emailFallback,
-      phone: customerInfo.phone.trim(),
-      address: customerInfo.address.trim(),
-      neighborhood: customerInfo.neighborhood.trim(),
-      city: customerInfo.city.trim(),
-      department: customerInfo.department,
-      deliveryNotes: customerInfo.deliveryNotes.trim(),
-      paymentMethod: customerInfo.paymentMethod,
-      country: 'Colombia',
-      items: cart.map((item) => ({
-        productId: String(item.id),
-        title: item.title,
-        price: Number(item.price),
-        quantity: item.quantity,
-        color: item.color || 'Asphalt',
-        size: item.size || 'MED',
-        image: item.image,
-        tier: item.tier || 'finished',
-      })),
-      shippingCost,
-      total: grandTotal,
-    };
+    if (submittingRef.current || isProcessing) return;
 
     try {
+      if (cart.length === 0) {
+        showToast("TU CARRITO DE COMPRAS ESTÁ VACÍO", "warning");
+        return;
+      }
+      if (!customerInfo.name || !customerInfo.name.trim()) {
+        showToast("POR FAVOR INGRESA TU NOMBRE COMPLETO", "warning");
+        return;
+      }
+      const cleanPhone = (customerInfo.phone || '').replace(/\D/g, '');
+      if (cleanPhone.length < 7) {
+        showToast("POR FAVOR INGRESA UN CELULAR O WHATSAPP VÁLIDO", "warning");
+        return;
+      }
+      if (!customerInfo.address || !customerInfo.address.trim()) {
+        showToast("POR FAVOR INGRESA TU DIRECCIÓN DE ENTREGA", "warning");
+        return;
+      }
+      if (!customerInfo.neighborhood || !customerInfo.neighborhood.trim()) {
+        showToast("POR FAVOR INDICA EL BARRIO DE ENTREGA", "warning");
+        return;
+      }
+      if (!agreed) {
+        showToast("POR FAVOR CONFIRMA EL PAGO CONTRAENTREGA PARA CONTINUAR", "warning");
+        return;
+      }
+
+      submittingRef.current = true;
+      setIsProcessing(true);
+
+      const emailFallback = currentUser?.email || `${cleanPhone}@cliente.kuropunk.com`;
+
+      const orderPayload = {
+        customerName: (customerInfo.name || '').trim(),
+        email: emailFallback,
+        phone: (customerInfo.phone || '').trim(),
+        address: (customerInfo.address || '').trim(),
+        neighborhood: (customerInfo.neighborhood || '').trim(),
+        city: (customerInfo.city || '').trim(),
+        department: customerInfo.department || 'Antioquia',
+        deliveryNotes: (customerInfo.deliveryNotes || '').trim(),
+        paymentMethod: customerInfo.paymentMethod || 'EFECTIVO_CONTRAENTREGA',
+        country: 'Colombia',
+        items: cart.map((item) => ({
+          productId: String(item.id),
+          title: item.title,
+          price: Number(item.price),
+          quantity: item.quantity,
+          color: item.color || 'Asphalt',
+          size: item.size || 'MED',
+          image: item.image,
+          tier: item.tier || 'finished',
+        })),
+        shippingCost,
+        total: grandTotal,
+      };
+
       const res = await submitOrder(orderPayload);
 
       const generatedOrderId = res.id || `VS-${Math.floor(100000 + Math.random() * 900000)}`;
       const generatedTracking = res.trackingCode || `KP-COP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-      // Sincronización en Firestore
-      try {
-        await createFirestoreOrder({
-          id: generatedOrderId,
-          userId: currentUser?.uid || `guest_${cleanPhone}`,
-          customerName: customerInfo.name.trim(),
-          phone: customerInfo.phone.trim(),
-          email: emailFallback,
-          address: customerInfo.address.trim(),
-          neighborhood: customerInfo.neighborhood.trim(),
-          city: customerInfo.city.trim(),
-          department: customerInfo.department,
-          deliveryNotes: customerInfo.deliveryNotes.trim(),
-          paymentMethod: customerInfo.paymentMethod,
-          items: cart,
-          total: grandTotal,
-          trackingCode: generatedTracking,
-        });
-      } catch (fErr) {
+      // Sincronización en segundo plano con Firestore (UX ultrarrápida sin bloqueo de render)
+      createFirestoreOrder({
+        id: generatedOrderId,
+        userId: currentUser?.uid || `guest_${cleanPhone}`,
+        customerName: (customerInfo.name || '').trim(),
+        phone: (customerInfo.phone || '').trim(),
+        email: emailFallback,
+        address: (customerInfo.address || '').trim(),
+        neighborhood: (customerInfo.neighborhood || '').trim(),
+        city: (customerInfo.city || '').trim(),
+        department: customerInfo.department,
+        deliveryNotes: (customerInfo.deliveryNotes || '').trim(),
+        paymentMethod: customerInfo.paymentMethod,
+        items: cart,
+        total: grandTotal,
+        trackingCode: generatedTracking,
+      }).catch((fErr) => {
         console.warn('[Firestore] Advertencia al sincronizar orden:', fErr);
-      }
+      });
 
       setOrderConfirmed({
         id: generatedOrderId,
@@ -186,6 +187,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
       console.error('[Checkout Error]', err);
       showToast(err.message || "NO SE PUDO REGISTRAR EL PEDIDO. REVISA LOS DATOS", "error");
     } finally {
+      submittingRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -198,8 +200,8 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
   };
 
   return (
-    <AuthGuard intent="checkout" fallbackMessage="Inicia sesión o regístrate para asegurar tu pedido contraentrega y activar el seguimiento en tiempo real con el taller.">
-      <div className="w-full pt-2 pb-28 sm:pb-20 bg-[#0d0c0c] min-h-screen text-[#e6e1e1]">
+    <AuthGuard intent="checkout" allowGuest={true} fallbackMessage="Inicia sesión o regístrate para asegurar tu pedido contraentrega y activar el seguimiento en tiempo real con el taller.">
+      <div className="w-full pt-2 pb-32 sm:pb-20 bg-[#0d0c0c] min-h-screen text-[#e6e1e1]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 md:px-12 relative z-10">
           
           {/* Navegación superior */}
@@ -257,13 +259,34 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                 </button>
               </div>
 
-              {/* Botones de Acción Post-Compra */}
-              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+              {/* Botón Principal WhatsApp para Atención Inmediata */}
+              <div className="pt-2">
+                <a
+                  href={generateWhatsAppOrderUrl(orderConfirmed)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full min-h-[48px] px-6 py-3 bg-[#25D366] hover:bg-[#1fa851] text-black font-mono text-xs sm:text-sm uppercase font-bold flex items-center justify-center gap-2 shadow-xl transition-all active:scale-98"
+                >
+                  <MessageSquare className="w-5 h-5 fill-black" />
+                  <span>Notificar al Taller por WhatsApp</span>
+                </a>
+              </div>
+
+              {/* Botones de Acción Secundarios Post-Compra */}
+              <div className="flex flex-wrap justify-center gap-3 pt-1">
+                {onOpenTracking && (
+                  <button
+                    onClick={() => onOpenTracking(orderConfirmed.trackingCode)}
+                    className="min-h-[44px] px-4 py-2.5 bg-[#262424] border border-neutral-700 text-[#ffb4ab] font-mono text-xs uppercase font-bold hover:bg-[#333030] flex items-center justify-center gap-2"
+                  >
+                    <Truck className="w-4 h-4 text-[#e0141f]" /> Rastrear Pedido
+                  </button>
+                )}
                 <button
                   onClick={() => downloadReceiptPDF(orderConfirmed)}
-                  className="min-h-[44px] px-5 py-2.5 bg-[#262424] border border-neutral-700 text-neutral-200 font-mono text-xs uppercase font-bold hover:bg-[#333030] flex items-center justify-center gap-2"
+                  className="min-h-[44px] px-4 py-2.5 bg-[#262424] border border-neutral-700 text-neutral-200 font-mono text-xs uppercase font-bold hover:bg-[#333030] flex items-center justify-center gap-2"
                 >
-                  <Printer className="w-4 h-4" /> Descargar PDF
+                  <Printer className="w-4 h-4" /> Recibo PDF
                 </button>
                 <button
                   onClick={onBackToShop}
@@ -347,31 +370,31 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                               </button>
                             </div>
 
-                            <div className="flex justify-between items-center mt-2">
-                              {/* Selector de cantidad con Touch Target accesible (>= 44px) */}
+                            <div className="flex flex-wrap justify-between items-center gap-2 mt-2">
+                              {/* Selector de cantidad con Touch Target accesible (>= 40-44px) */}
                               <div className="flex items-center border border-neutral-700 bg-[#211f1f]">
                                 <button
                                   type="button"
                                   onClick={() => updateQuantity(item.id, -1)}
-                                  className="w-10 h-10 flex items-center justify-center text-lg text-white hover:bg-neutral-700 active:bg-neutral-600"
+                                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-lg text-white hover:bg-neutral-700 active:bg-neutral-600 transition-colors"
                                   aria-label="Restar una unidad"
                                 >
                                   -
                                 </button>
-                                <span className="font-mono text-xs text-white min-w-7 text-center font-bold">
+                                <span className="font-mono text-xs text-white min-w-8 text-center font-bold">
                                   {item.quantity}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => updateQuantity(item.id, 1)}
-                                  className="w-10 h-10 flex items-center justify-center text-lg text-white hover:bg-neutral-700 active:bg-neutral-600"
+                                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-lg text-white hover:bg-neutral-700 active:bg-neutral-600 transition-colors"
                                   aria-label="Sumar una unidad"
                                 >
                                   +
                                 </button>
                               </div>
 
-                              <span className="font-mono text-sm sm:text-base font-bold text-[#ffb4ab]">
+                              <span className="font-mono text-sm sm:text-base font-bold text-[#ffb4ab] shrink-0">
                                 {formatCOP(item.price * item.quantity)}
                               </span>
                             </div>
@@ -636,7 +659,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
 
           {/* Barra Fija Inferior en Móvil (Zona del Pulgar) */}
           {!orderConfirmed && cart.length > 0 && (
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#141313]/95 backdrop-blur-md border-t border-[#5e3f3c] p-3 px-4 shadow-[0_-8px_20px_rgba(0,0,0,0.6)]">
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#141313]/95 backdrop-blur-md border-t border-[#5e3f3c] p-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-8px_20px_rgba(0,0,0,0.6)]">
               <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-mono text-neutral-400 uppercase">Total Contraentrega</span>

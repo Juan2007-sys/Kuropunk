@@ -183,20 +183,21 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
   return (
     <div
       onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto overscroll-contain"
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
     >
       <div
         ref={modalRef}
-        className="max-w-md w-full max-h-[90vh] overflow-y-auto bg-[#0F0F0F] border border-neutral-800 rounded-xl shadow-2xl p-6 relative"
+        data-lenis-prevent="true"
+        className="max-w-md w-full max-h-[92dvh] overflow-y-auto bg-[#0F0F0F] border border-neutral-800 rounded-t-2xl sm:rounded-xl shadow-2xl p-5 sm:p-6 relative custom-scrollbar my-auto"
       >
-        {/* Close button X */}
+        {/* Close button X (44x44px touch target) */}
         <button
           onClick={onClose}
           type="button"
-          className="absolute top-4 right-4 text-neutral-400 hover:text-white p-1 rounded hover:bg-neutral-800/80 transition-colors focus:outline-none focus:ring-1 focus:ring-[#e0141f]"
+          className="absolute top-3 right-3 text-neutral-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center rounded hover:bg-neutral-800/80 transition-colors focus:outline-none focus:ring-1 focus:ring-[#e0141f]"
           aria-label="Cerrar modal de autenticación"
         >
           <X className="w-5 h-5" />
@@ -310,7 +311,7 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Ej: Mateo Gómez"
-                    className="w-full pl-10 pr-3 py-2 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-xs outline-none transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-base sm:text-xs outline-none transition-colors min-h-[44px]"
                   />
                 </div>
               </div>
@@ -326,7 +327,7 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+57 301 569 0382"
-                    className="w-full pl-10 pr-3 py-2 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-xs outline-none transition-colors"
+                    className="w-full pl-10 pr-3 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-base sm:text-xs outline-none transition-colors min-h-[44px]"
                   />
                 </div>
               </div>
@@ -345,7 +346,7 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="operativo@kuropunk.co"
-                className="w-full pl-10 pr-3 py-2 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-xs outline-none transition-colors"
+                className="w-full pl-10 pr-3 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-base sm:text-xs outline-none transition-colors min-h-[44px]"
               />
             </div>
           </div>
@@ -362,7 +363,7 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full pl-10 pr-3 py-2 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-xs outline-none transition-colors"
+                className="w-full pl-10 pr-3 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-base sm:text-xs outline-none transition-colors min-h-[44px]"
               />
             </div>
           </div>

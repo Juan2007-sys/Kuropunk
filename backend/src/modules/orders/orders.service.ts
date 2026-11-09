@@ -1,15 +1,45 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
+import { randomUUID } from 'crypto';
 import { OrderEntity } from '../../database/entities/order.entity';
 import { OrderItemEntity } from '../../database/entities/order-item.entity';
 import { ProductEntity } from '../../database/entities/product.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { WhatsAppService, WhatsAppOrderStatus } from './whatsapp.service';
 
+const ALLOWED_STATUSES = [
+  'PLACED',
+  'PENDING',
+  'CONFIRMED',
+  'IN_PRODUCTION',
+  'DISPATCHED',
+  'SHIPPED',
+  'DELIVERED',
+  'CANCELLED',
+] as const;
+
 @Injectable()
 export class OrdersService {
+  // Mapa en memoria para idempotencia de compras (evita doble clic en ventana de 15s)
+  private readonly recentOrderFingerprints = new Map<string, number>();
+
+  // Cola de serialización de transacciones para evitar colisiones SQLITE_BUSY / nested transactions en ráfagas concurrentes
+  private txMutex: Promise<unknown> = Promise.resolve();
+
+  private runAtomicTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+    const next = this.txMutex.then(() => this.dataSource.transaction(work));
+    this.txMutex = next.catch(() => {});
+    return next;
+  }
+
   constructor(
+    private readonly dataSource: DataSource,
     @InjectRepository(OrderEntity)
     private readonly orderRepo: Repository<OrderEntity>,
     @InjectRepository(OrderItemEntity)
@@ -24,108 +54,139 @@ export class OrdersService {
       throw new BadRequestException('El pedido debe contener al menos un producto.');
     }
 
-    const orderId =
-      createOrderDto.id || `VS-${Math.floor(100000 + Math.random() * 900000)}`;
+    // 1. Protección anti-doble clic (Idempotencia por huella de comprador + carrito en ventana de 15s)
+    const itemsSignature = createOrderDto.items
+      .map((i) => `${i.productId}:${i.quantity}`)
+      .sort()
+      .join('|');
+    const fingerprint = `${(createOrderDto.phone || createOrderDto.email).trim().toLowerCase()}__${itemsSignature}`;
+    const now = Date.now();
+    const lastAttempt = this.recentOrderFingerprints.get(fingerprint);
 
-    let subtotal = 0;
-    const itemsToSave: OrderItemEntity[] = [];
+    if (lastAttempt && now - lastAttempt < 15000) {
+      throw new ConflictException(
+        'Ya estamos procesando un pedido idéntico tuyo. Espera unos segundos para evitar cobros duplicados.',
+      );
+    }
+    this.recentOrderFingerprints.set(fingerprint, now);
 
-    for (const itemDto of createOrderDto.items) {
-      // 1. Buscar producto en base de datos para verificar catálogo y calcular precio real
-      const product = await this.productRepo.findOne({
-        where: { id: itemDto.productId },
-      });
-
-      let calculatedPrice = Number(itemDto.price || 0);
-
-      if (product) {
-        const basePrice = Number(product.price);
-        if (itemDto.tier === 'digital') {
-          calculatedPrice = basePrice < 50000 ? basePrice : 25000;
-        } else if (itemDto.tier === 'kit') {
-          calculatedPrice = product.kitPrice ? Number(product.kitPrice) : Math.round(basePrice * 0.65);
-        } else {
-          calculatedPrice = basePrice;
-        }
-      }
-
-      const lineTotal = calculatedPrice * itemDto.quantity;
-      subtotal += lineTotal;
-
-      const titleWithTier = itemDto.tier && itemDto.tier !== 'finished'
-        ? `${product ? product.title : itemDto.title} [${itemDto.tier.toUpperCase()}]`
-        : (product ? product.title : itemDto.title);
-
-      const itemEntity = this.orderItemRepo.create({
-        orderId,
-        productId: itemDto.productId,
-        title: titleWithTier,
-        price: calculatedPrice,
-        quantity: itemDto.quantity,
-        color: itemDto.color,
-        size: itemDto.size,
-        image: product ? product.image : itemDto.image,
-      });
-
-      itemsToSave.push(itemEntity);
-
-      // Decrementar stock únicamente para piezas físicas terminadas o kits
-      if (product && product.type === 'amigurumi' && itemDto.tier !== 'digital') {
-        const newStock = Math.max(0, product.stock - itemDto.quantity);
-        product.stock = newStock;
-        if (newStock === 0) {
-          product.badge = 'SOLD OUT';
-          product.badgeType = 'sold-out';
-        }
-        await this.productRepo.save(product);
+    // Limpieza periódica de huellas expiradas
+    if (this.recentOrderFingerprints.size > 500) {
+      for (const [k, ts] of this.recentOrderFingerprints.entries()) {
+        if (now - ts >= 15000) this.recentOrderFingerprints.delete(k);
       }
     }
 
-    // Flete unificado: gratis para compras >= $150.000 COP, sino $15.000 COP
-    const shippingCost = subtotal >= 150000 ? 0 : 15000;
-    const total = subtotal + shippingCost;
-    const trackingCode = `KURO-TRK-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+    try {
+      // 2. Transacción Atómica: Si falla 1 solo ítem, se hace ROLLBACK de todo el stock descontado
+      const savedOrder = await this.runAtomicTransaction(async (manager) => {
+        const orderId = `VS-${randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase()}`;
+        let subtotal = 0;
+        const itemsToSave: OrderItemEntity[] = [];
 
-    // Construcción enriquecida de dirección para el despacho contraentrega
-    const addressSegments = [
-      createOrderDto.address,
-      createOrderDto.neighborhood ? `Barrio: ${createOrderDto.neighborhood}` : null,
-      createOrderDto.deliveryNotes ? `Indicaciones: ${createOrderDto.deliveryNotes}` : null,
-      createOrderDto.paymentMethod ? `Método: ${createOrderDto.paymentMethod}` : null,
-    ].filter(Boolean);
+        for (const itemDto of createOrderDto.items) {
+          // Prohibido confiar en productos que no existan en la base de datos (Anti-Price Tampering)
+          const product = await manager.findOne(ProductEntity, {
+            where: { id: itemDto.productId },
+          });
 
-    const fullAddress = addressSegments.join(' | ');
+          if (!product) {
+            throw new NotFoundException(
+              `El producto "${itemDto.productId}" no existe en el catálogo oficial.`,
+            );
+          }
 
-    const fullCity = createOrderDto.department
-      ? `${createOrderDto.city}, ${createOrderDto.department}`
-      : createOrderDto.city;
+          // Solo se vende el coleccionable físico al precio oficial de la BD (ignora itemDto.price y tier)
+          const officialUnitPrice = Number(product.price);
+          if (officialUnitPrice <= 0) {
+            throw new BadRequestException(`Precio inválido en catálogo para "${product.title}".`);
+          }
 
-    const order = this.orderRepo.create({
-      id: orderId,
-      customerName: createOrderDto.customerName,
-      email: createOrderDto.email,
-      phone: createOrderDto.phone,
-      address: fullAddress,
-      city: fullCity,
-      country: createOrderDto.country || 'Colombia',
-      subtotal,
-      shippingCost,
-      total,
-      status: 'CONFIRMED',
-      trackingCode,
-      items: itemsToSave,
-    });
+          // Descuento atómico condicional dentro de la misma transacción
+          const qty = Number(itemDto.quantity);
+          const updateResult = await manager
+            .createQueryBuilder()
+            .update(ProductEntity)
+            .set({
+              stock: () => `stock - ${qty}`,
+              badge: () =>
+                `CASE WHEN stock - ${qty} <= 0 THEN 'SOLD OUT' ELSE badge END`,
+              badgeType: () =>
+                `CASE WHEN stock - ${qty} <= 0 THEN 'sold-out' ELSE badgeType END`,
+            })
+            .where('id = :id AND stock >= :qty', {
+              id: product.id,
+              qty,
+            })
+            .execute();
 
-    const savedOrder = await this.orderRepo.save(order);
+          if (updateResult.affected === 0) {
+            throw new BadRequestException(
+              `La pieza "${product.title}" no cuenta con unidades suficientes en taller (${product.stock} disponible${product.stock === 1 ? '' : 's'}).`,
+            );
+          }
 
-    // Trigger automated WhatsApp notification for order placed in background
-    this.whatsappService
-      .dispatchOrderStatusNotification(savedOrder, 'placed')
-      .catch((err) => {
-        // Non-blocking error handling
+          const lineTotal = officialUnitPrice * qty;
+          subtotal += lineTotal;
+
+          const itemEntity = manager.create(OrderItemEntity, {
+            orderId,
+            productId: product.id,
+            title: product.title,
+            price: officialUnitPrice,
+            quantity: qty,
+            color: itemDto.color || 'Asphalt',
+            size: product.size || itemDto.size || 'MED',
+            image: product.image,
+          });
+
+          itemsToSave.push(itemEntity);
+        }
+
+        const shippingCost = subtotal >= 150000 ? 0 : 15000;
+        const total = subtotal + shippingCost;
+        const trackingCode = `KURO-TRK-${randomUUID().replace(/-/g, '').substring(0, 7).toUpperCase()}`;
+
+        const addressSegments = [
+          createOrderDto.address,
+          createOrderDto.neighborhood ? `Barrio: ${createOrderDto.neighborhood}` : null,
+          createOrderDto.deliveryNotes ? `Indicaciones: ${createOrderDto.deliveryNotes}` : null,
+          createOrderDto.paymentMethod ? `Método: ${createOrderDto.paymentMethod}` : null,
+        ].filter(Boolean);
+
+        const fullCity = createOrderDto.department
+          ? `${createOrderDto.city}, ${createOrderDto.department}`
+          : createOrderDto.city;
+
+        const order = manager.create(OrderEntity, {
+          id: orderId,
+          customerName: createOrderDto.customerName,
+          email: createOrderDto.email,
+          phone: createOrderDto.phone,
+          address: addressSegments.join(' | '),
+          city: fullCity,
+          country: createOrderDto.country || 'Colombia',
+          subtotal,
+          shippingCost,
+          total,
+          status: 'CONFIRMED',
+          trackingCode,
+          items: itemsToSave,
+        });
+
+        return await manager.save(OrderEntity, order);
       });
 
-    return savedOrder;
+      this.whatsappService
+        .dispatchOrderStatusNotification(savedOrder, 'placed')
+        .catch(() => {});
+
+      return savedOrder;
+    } catch (error) {
+      // Si la transacción falló (ej. sin stock), liberar la huella para que el usuario pueda ajustar su carrito
+      this.recentOrderFingerprints.delete(fingerprint);
+      throw error;
+    }
   }
 
   async findOne(id: string): Promise<OrderEntity> {
@@ -135,33 +196,38 @@ export class OrdersService {
     });
 
     if (!order) {
-      throw new NotFoundException(`Order #${id} not found`);
+      throw new NotFoundException(`Orden #${id} no encontrada`);
     }
 
     return order;
   }
 
   async findAll(limit = 20, page = 1): Promise<{ orders: OrderEntity[]; total: number }> {
+    const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100);
+    const safePage = Math.max(1, Number(page) || 1);
+
     const [orders, total] = await this.orderRepo.findAndCount({
       relations: ['items'],
       order: { createdAt: 'DESC' },
-      take: limit,
-      skip: (page - 1) * limit,
+      take: safeLimit,
+      skip: (safePage - 1) * safeLimit,
     });
 
     return { orders, total };
   }
 
   async trackOrder(query: string): Promise<OrderEntity> {
-    const clean = query.trim();
+    const clean = (query || '').trim();
+    if (!clean || clean.length < 5) {
+      throw new BadRequestException('Ingresa un código de orden (#VS-...) o código de rastreo válido.');
+    }
 
-    // 1. Search by Order ID
+    // Seguridad Anti-IDOR: Solo permitir búsqueda por ID de Orden o Tracking Code (NO por teléfono suelto)
     let order = await this.orderRepo.findOne({
       where: { id: clean },
       relations: ['items'],
     });
 
-    // 2. Search by Tracking Code
     if (!order) {
       order = await this.orderRepo.findOne({
         where: { trackingCode: clean },
@@ -169,24 +235,14 @@ export class OrdersService {
       });
     }
 
-    // 3. Search by Phone number
     if (!order) {
-      order = await this.orderRepo.findOne({
-        where: { phone: clean },
-        relations: ['items'],
-        order: { createdAt: 'DESC' },
-      });
+      throw new NotFoundException(`No encontramos ninguna orden con el código "${clean}".`);
     }
 
-    if (!order) {
-      throw new NotFoundException(`No encontramos ninguna orden con el identificador "${clean}".`);
-    }
-
-    // PRIVACY & PII SANITIZATION (Ley 1581 / Habeas Data):
-    // Mask sensitive residential details on public tracker to prevent dox/identity leaks
-    const maskedName = order.customerName
-      ? order.customerName.replace(/^(..)(.*)(..)$/, (_, start, mid, end) => `${start}${'*'.repeat(Math.min(mid.length, 6))}${end}`)
-      : 'Cliente KuroPunk';
+    const nameParts = (order.customerName || 'Cliente').trim().split(/\s+/);
+    const maskedName = nameParts
+      .map((part) => (part.length <= 2 ? `${part[0]}*` : `${part.slice(0, 2)}****`))
+      .join(' ');
 
     const maskedPhone = order.phone
       ? order.phone.replace(/(\d{3})\d+(\d{2})/, '$1******$2')
@@ -198,6 +254,7 @@ export class OrdersService {
 
     return {
       ...order,
+      email: '***@***',
       customerName: maskedName,
       phone: maskedPhone,
       address: safeAddress,
@@ -205,21 +262,86 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, status: string): Promise<OrderEntity> {
-    const order = await this.findOne(id);
-    const previousStatus = order.status;
-    order.status = status;
-    const updated = await this.orderRepo.save(order);
+    const normalizedStatus = (status || '').trim().toUpperCase();
+    const isCancelTarget =
+      normalizedStatus === 'CANCELLED' ||
+      normalizedStatus === 'CANCELADO' ||
+      normalizedStatus === 'CANCEL';
 
-    // Trigger automated WhatsApp notification in background on order lifecycle change
-    if (previousStatus !== status) {
-      this.whatsappService
-        .dispatchOrderStatusNotification(
-          updated,
-          status as WhatsAppOrderStatus,
-        )
-        .catch(() => {});
+    const finalStatus = isCancelTarget ? 'CANCELLED' : normalizedStatus;
+
+    if (!ALLOWED_STATUSES.includes(finalStatus as any)) {
+      throw new BadRequestException(`Estado de orden no válido: "${status}".`);
     }
 
-    return updated;
+    const updatedOrder = await this.runAtomicTransaction(async (manager) => {
+      const order = await manager.findOne(OrderEntity, {
+        where: { id },
+        relations: ['items'],
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Orden #${id} no encontrada.`);
+      }
+
+      const prevUpper = (order.status || '').toUpperCase();
+
+      // Bloquear transiciones ilegales desde una orden ya cancelada (evita inflación infinita de stock)
+      if (prevUpper === 'CANCELLED' && finalStatus !== 'CANCELLED') {
+        throw new BadRequestException(
+          `La orden #${id} ya fue cancelada y su stock fue restituido; no puede reabrirse.`,
+        );
+      }
+
+      if (prevUpper === finalStatus) {
+        return order;
+      }
+
+      // Cambio de estado atómico condicional: garantiza que solo 1 petición concurrente gane la transición
+      const statusUpdate = await manager
+        .createQueryBuilder()
+        .update(OrderEntity)
+        .set({ status: finalStatus })
+        .where('id = :id AND status = :prevStatus', {
+          id,
+          prevStatus: order.status,
+        })
+        .execute();
+
+      if (statusUpdate.affected === 0) {
+        throw new ConflictException(
+          `El estado de la orden #${id} fue modificado simultáneamente por otra operación.`,
+        );
+      }
+
+      // Si pasa a CANCELLED por primera vez, restituir el stock de forma atómica dentro de la transacción
+      if (finalStatus === 'CANCELLED' && order.items?.length > 0) {
+        for (const item of order.items) {
+          if (item.productId) {
+            await manager
+              .createQueryBuilder()
+              .update(ProductEntity)
+              .set({
+                stock: () => `stock + ${Number(item.quantity)}`,
+                badge: () =>
+                  `CASE WHEN badge = 'SOLD OUT' THEN 'EDICIÓN LIMITADA' ELSE badge END`,
+                badgeType: () =>
+                  `CASE WHEN badgeType = 'sold-out' THEN 'primary' ELSE badgeType END`,
+              })
+              .where('id = :id', { id: item.productId })
+              .execute();
+          }
+        }
+      }
+
+      order.status = finalStatus;
+      return order;
+    });
+
+    this.whatsappService
+      .dispatchOrderStatusNotification(updatedOrder, finalStatus.toLowerCase() as WhatsAppOrderStatus)
+      .catch(() => {});
+
+    return updatedOrder;
   }
 }

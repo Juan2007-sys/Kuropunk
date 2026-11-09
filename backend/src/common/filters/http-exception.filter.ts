@@ -22,13 +22,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
-    const message =
+    const rawResponse =
       exception instanceof HttpException
         ? exception.getResponse()
-        : 'Internal server error';
+        : { message: 'Error interno del servidor. Operación protegida.' };
+
+    // Nunca exponer trazas de pila (stack traces) ni errores crudos de SQL al cliente
+    const safeError =
+      status === HttpStatus.INTERNAL_SERVER_ERROR
+        ? { message: 'Error interno del servidor. Intenta de nuevo más tarde.' }
+        : typeof rawResponse === 'object'
+          ? rawResponse
+          : { message: rawResponse };
 
     this.logger.error(
-      `[${request.method}] ${request.url} - Status: ${status} - Error: ${JSON.stringify(message)}`
+      `[${request.method}] ${request.url} - Status: ${status} - Error: ${JSON.stringify(rawResponse)}`
     );
 
     response.status(status).json({
@@ -36,7 +44,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
-      error: typeof message === 'object' ? message : { message },
+      error: safeError,
     });
   }
 }

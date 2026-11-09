@@ -123,38 +123,40 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-[#0e0d0d] border-2 border-[#e0141f] w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl overflow-hidden font-body-md text-neutral-200"
+          className="bg-[#0e0d0d] border-2 border-[#e0141f] w-full max-w-5xl h-[92dvh] max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden font-body-md text-neutral-200"
         >
           {/* Header Superior */}
-          <div className="flex items-center justify-between px-5 py-3.5 bg-[#161414] border-b border-neutral-800">
-            <div className="flex items-center gap-3">
-              <span className="w-3 h-3 bg-[#e0141f] animate-pulse"></span>
-              <div>
-                <h3 className="font-headline-md text-lg text-white tracking-wider uppercase flex items-center gap-2">
-                  VISOR TÁCTICO DE PUNTO DE CRUZ // {productTitle}
+          <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#161414] border-b border-neutral-800 shrink-0">
+            <div className="flex items-center gap-3 min-w-0 pr-2">
+              <span className="w-3 h-3 bg-[#e0141f] animate-pulse shrink-0"></span>
+              <div className="min-w-0">
+                <h3 className="font-headline-md text-sm sm:text-lg text-white tracking-wider uppercase truncate">
+                  VISOR DMC // {productTitle}
                 </h3>
-                <p className="text-[11px] font-mono text-[#ffb4ab]">
-                  MATRIZ 14CT AIDA • TABLA DMC NORMALIZADA • TACHADO DE CRUCES EN VIVO
+                <p className="text-[10px] sm:text-[11px] font-mono text-[#ffb4ab] truncate">
+                  MATRIZ 14CT AIDA • TABLA DMC • TACHADO EN VIVO
                 </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white bg-[#201a1a] hover:bg-[#e0141f] transition-colors border border-neutral-700"
+              aria-label="Cerrar visor táctico"
+              className="w-11 h-11 -mr-2 flex items-center justify-center text-neutral-400 hover:text-white bg-[#201a1a] hover:bg-[#e0141f] transition-colors border border-neutral-700 shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Barra de Herramientas */}
-          <div className="flex flex-wrap items-center justify-between px-5 py-2.5 bg-[#121111] border-b border-neutral-800 text-xs font-mono gap-3">
+          <div className="flex flex-wrap items-center justify-between px-3 sm:px-5 py-2.5 bg-[#121111] border-b border-neutral-800 text-xs font-mono gap-2 sm:gap-3 shrink-0">
             {/* Modos de interacción */}
             <div className="flex items-center gap-2">
-              <span className="text-neutral-400 uppercase">MODO:</span>
+              <span className="text-neutral-400 uppercase hidden sm:inline">MODO:</span>
               <button
+                type="button"
                 onClick={() => setActiveMode('inspect')}
-                className={`px-3 py-1 border transition-colors ${
+                className={`min-h-[40px] px-3 py-1 border flex items-center transition-colors active:scale-95 ${
                   activeMode === 'inspect'
                     ? 'bg-[#e0141f] text-white border-[#e0141f]'
                     : 'bg-[#1a1818] text-neutral-400 border-neutral-700 hover:text-white'
@@ -163,22 +165,24 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
                 🔍 AISLAR HILOS
               </button>
               <button
+                type="button"
                 onClick={() => setActiveMode('stitch')}
-                className={`px-3 py-1 border transition-colors ${
+                className={`min-h-[40px] px-3 py-1 border flex items-center transition-colors active:scale-95 ${
                   activeMode === 'stitch'
                     ? 'bg-emerald-600 text-white border-emerald-500 font-bold'
                     : 'bg-[#1a1818] text-neutral-400 border-neutral-700 hover:text-white'
                 }`}
               >
-                ✓ BORDAR (MARCAR HECHO)
+                ✓ BORDAR (MARCAR)
               </button>
             </div>
 
             {/* Controles de Zoom & Opciones */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
+                type="button"
                 onClick={() => setShowSymbols(!showSymbols)}
-                className={`px-2.5 py-1 border text-[11px] ${
+                className={`min-h-[40px] px-2.5 py-1 border text-[11px] flex items-center transition-colors ${
                   showSymbols ? 'bg-[#2a2222] text-[#ffb4ab] border-[#e0141f]' : 'bg-[#181616] text-neutral-400 border-neutral-700'
                 }`}
               >
@@ -187,26 +191,32 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
 
               <div className="flex items-center border border-neutral-700 bg-[#161414]">
                 <button
+                  type="button"
                   onClick={() => setZoomLevel(z => Math.max(0.7, z - 0.15))}
-                  className="px-2 py-1 text-neutral-300 hover:text-white hover:bg-neutral-800"
+                  aria-label="Alejar"
+                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-300 hover:text-white hover:bg-neutral-800 active:scale-95 transition-all"
                 >
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
-                <span className="px-2 text-[11px] text-neutral-400">{Math.round(zoomLevel * 100)}%</span>
+                <span className="px-2 text-[11px] text-neutral-400 min-w-10 text-center">{Math.round(zoomLevel * 100)}%</span>
                 <button
+                  type="button"
                   onClick={() => setZoomLevel(z => Math.min(1.8, z + 0.15))}
-                  className="px-2 py-1 text-neutral-300 hover:text-white hover:bg-neutral-800"
+                  aria-label="Acercar"
+                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-300 hover:text-white hover:bg-neutral-800 active:scale-95 transition-all"
                 >
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
               </div>
 
               <button
+                type="button"
                 onClick={resetProgress}
                 title="Reiniciar progreso"
-                className="p-1 text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 border border-neutral-700"
+                aria-label="Reiniciar progreso"
+                className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 border border-neutral-700 transition-colors"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -215,7 +225,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
           <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
             
             {/* Sidebar Izquierdo: Catálogo de Hilos DMC (4 cols) */}
-            <div className="md:col-span-4 bg-[#141212] border-r border-neutral-800 p-4 overflow-y-auto space-y-4">
+            <div data-lenis-prevent="true" className="md:col-span-4 bg-[#141212] border-r border-neutral-800 p-4 overflow-y-auto space-y-4 custom-scrollbar">
               <div>
                 <div className="text-[11px] font-mono text-[#ffb4ab] uppercase tracking-wider mb-1 flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-[#e0141f]" />

@@ -6,10 +6,9 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Wrench, Sparkles, Flame, ShieldAlert } from 'lucide-react';
 
 export const HomePage = ({ setCurrentView, onSelectProduct }) => {
-  const heroProduct = PRODUCTS.find((p) => p.id === 'the-wanderer') || PRODUCTS[0];
-  const latestDrops = PRODUCTS.filter((p) =>
-    ['spike-alley-rat', 'ghost-vandal', 'brute-hound'].includes(p.id)
-  );
+  const activeProducts = PRODUCTS.filter((p) => p.isActive !== false);
+  const heroProduct = activeProducts.find((p) => p.isHero) || activeProducts[0] || PRODUCTS[0];
+  const latestDrops = activeProducts.slice(0, 3);
 
   return (
     <div className="flex flex-col w-full">
@@ -99,17 +98,17 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
             <div className="spray-stroke-red top-0 left-0 w-64 h-16 transform rotate-3 pointer-events-none opacity-40"></div>
             <div>
               <span className="font-label-caps text-xs text-[#ffb4ab] uppercase tracking-widest block mb-1">
-                [ CHOOSE YOUR WEAPON ]
+                [ ELIGE TU ARSENAL ]
               </span>
               <h2 className="font-headline-md text-3xl sm:text-4xl text-[#e6e1e1] uppercase tracking-tight relative z-10">
-                The Arsenal
+                El Arsenal
               </h2>
             </div>
             <button
               onClick={() => setCurrentView('shop')}
               className="mt-2 sm:mt-0 font-label-caps text-xs text-[#ffb4ab] hover:underline uppercase tracking-wider flex items-center gap-1.5 self-start sm:self-auto"
             >
-              Explore Full Vault <ArrowRight className="w-3.5 h-3.5" />
+              Explorar Catálogo Completo <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -126,14 +125,14 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
                 <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/20 transition-colors z-10 mix-blend-overlay"></div>
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
-                  alt="Beasts amigurumi category"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEoepjuPeA6nNHSod_0GRYJ32F7AomjDlIgPaffdFalnB6j3K6rQObozuZD-2wE5oArwR8ThZZ9_TPUhbUNhJPy4lv2a46xzKlPtb2ooQGwjOtfpemNivQU-8zfnAkWXch4RwnI3vaMwmJEqx7mwavgStXnglt3d0P_YnPy4eXIYhLkBq3y-12K_Ui5QSpLJOtXMTvWHiH_q2OTdHj-svVZ9y5RQnfutCYozhlvli8XWgMY6WOMdTh"
+                  alt="Categoría Dulce Princesa"
+                  src="/img/dulce-princesa-1.jpeg"
                 />
               </div>
               <h3 className="font-accent-tag text-lg text-[#e6e1e1] uppercase mb-1 group-hover:text-[#ffb4ab] transition-colors">
-                Beasts
+                Series & Rogues
               </h3>
-              <p className="font-body-md text-sm text-[#e7bcb8]/70">Street fauna & apex monsters.</p>
+              <p className="font-body-md text-sm text-[#e7bcb8]/70">Piezas coleccionables con plataforma.</p>
             </div>
 
             {/* Card 2: Rogues */}
@@ -147,14 +146,14 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
                 <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/20 transition-colors z-10 mix-blend-overlay"></div>
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
-                  alt="Rogues amigurumi category"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuChK4cJIxKqbWAjYucXDso9CGUYNKlKODAlGBBl6ZDrDKMUS8NuxLZXICSm_TmJgXmSap5oo1tAkItF5mJb8q57HbBybGJD5jkOnTMkP8iU15th9mwZz7VDm_xDPfrySsQhpkxEYL_FGvBWI2Kb7CdMTj4LuwTSs2b25TearqCYPsGluGFp7qAzHbxVaBSb3P3XCcCl8oWeVB8sj2kXgRk5PDMBYKKVrHG-VKiQdQRFtFodtOGZEBas"
+                  alt="Categoría Flagship Jungkook"
+                  src="/img/jungkook-cooky-plataforma-1.jpeg"
                 />
               </div>
               <h3 className="font-accent-tag text-lg text-[#e6e1e1] uppercase mb-1 group-hover:text-[#ffb4ab] transition-colors">
-                Rogues
+                Idol Flagship
               </h3>
-              <p className="font-body-md text-sm text-[#e7bcb8]/70">City dwellers & operatives.</p>
+              <p className="font-body-md text-sm text-[#e7bcb8]/70">Drops exclusivos y piezas maestras.</p>
             </div>
 
             {/* Card 3: Hardware */}
@@ -168,14 +167,14 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
                 <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/20 transition-colors z-10 mix-blend-overlay"></div>
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
-                  alt="Hardware amigurumi category"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnC7Czz_bDTQstozHsfvsDGtDeUCjT6-mAOBcVTslrw3alCDqIxkrRfPcQqCsieQqrKII3auNuIEtarOzCpZ-6dP-z5W7oxR3kyJdY8jCbdAnqwgLWt9079V574h7o4Z0RNOyUDWmIrj0IzYKvlpXrBHEDpMGBjrbmS-6jdfa7XRCCuY13EvlLxc2Eu6O3n47QdRI4wFwNgTYiA_o1RiGlU32dgzN1hCTMQAiwwtlzZeCQHSnDAsq7"
+                  alt="Categoría Mini Amigurumi"
+                  src="/img/jungkook-cooky-pequeno-1.jpeg"
                 />
               </div>
               <h3 className="font-accent-tag text-lg text-[#e6e1e1] uppercase mb-1 group-hover:text-[#ffb4ab] transition-colors">
-                Hardware
+                Alley Minis
               </h3>
-              <p className="font-body-md text-sm text-[#e7bcb8]/70">Everyday carry & keychains.</p>
+              <p className="font-body-md text-sm text-[#e7bcb8]/70">Miniaturas y artefactos portátiles.</p>
             </div>
 
             {/* Card 4: Commission */}
@@ -188,13 +187,13 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
               <div className="aspect-square w-full mb-4 overflow-hidden relative flex flex-col items-center justify-center bg-[#141313] border border-dashed border-[#5e3f3c] group-hover:border-[#e0141f] transition-colors">
                 <Wrench className="w-12 h-12 text-[#5e3f3c] group-hover:text-[#ffb4ab] group-hover:scale-110 transition-all" />
                 <span className="text-[10px] font-mono text-[#8a8a86] mt-2 tracking-widest uppercase">
-                  CUSTOM 1-OF-1
+                  ENCARGO 1-DE-1
                 </span>
               </div>
               <h3 className="font-accent-tag text-lg text-[#e6e1e1] uppercase mb-1 group-hover:text-[#ffb4ab] transition-colors">
-                Commission
+                Comisión
               </h3>
-              <p className="font-body-md text-sm text-[#e7bcb8]/70">Bespoke artisan orders.</p>
+              <p className="font-body-md text-sm text-[#e7bcb8]/70">Piezas únicas bajo pedido.</p>
             </div>
           </div>
         </div>
@@ -206,10 +205,10 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
           <div className="flex flex-col items-center justify-center text-center mb-14 relative z-10">
             <div className="spray-stroke-white top-0 left-1/2 -translate-x-1/2 w-96 h-20 transform -rotate-2 pointer-events-none opacity-40"></div>
             <span className="font-label-caps text-xs text-[#e0141f] uppercase tracking-widest font-bold mb-1">
-              LIMITED SUPPLY // BATCH 01
+              EDICIÓN LIMITADA // LOTE 01
             </span>
             <h2 className="font-headline-lg text-4xl sm:text-5xl text-[#e6e1e1] uppercase tracking-tight mb-2 relative z-10">
-              Latest Drops
+              Últimos Lanzamientos
             </h2>
             <div className="h-1 w-20 bg-[#e0141f] relative z-10"></div>
           </div>
@@ -232,7 +231,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
               onClick={() => setCurrentView('shop')}
               className="font-accent-tag text-lg text-[#ffb4ab] uppercase hover:text-white transition-colors border-b-2 border-[#ffb4ab] hover:border-[#e0141f] pb-1 flex items-center gap-2 group"
             >
-              <span>ENTER THE ARCHIVE</span>
+              <span>INGRESAR AL CATÁLOGO COMPLETO</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
@@ -266,18 +265,18 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
             </div>
 
             <h2 className="font-headline-lg text-3xl sm:text-4xl text-[#e6e1e1] uppercase mb-4 leading-tight relative z-10">
-              Behind<br />The Thread
+              Detrás<br />Del Hilo
             </h2>
 
             <p className="font-body-md text-base text-[#e7bcb8]/85 mb-6 relative z-10 leading-relaxed">
-              Every piece is a protest against mass production. Hand-stitched in the underground, born from the detritus of the city. We don't make toys. We make artifacts for those who live on the edge of the grid.
+              Cada pieza es una protesta contra la producción en serie. Tejida a mano en el underground, forjada desde el asfalto de la ciudad. No hacemos juguetes: creamos artefactos de colección para quienes desafían lo convencional.
             </p>
 
             <button
               onClick={() => setCurrentView('about')}
               className="relative z-10 font-label-caps text-xs text-[#e6e1e1] uppercase border border-[#5e3f3c] px-6 py-3 hover:bg-[#e0141f] hover:text-white hover:border-[#e0141f] transition-all bg-[#141313]/80"
             >
-              Read Manifesto
+              Leer Manifiesto
             </button>
           </motion.div>
         </div>

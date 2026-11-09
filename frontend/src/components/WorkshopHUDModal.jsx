@@ -128,38 +128,40 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md">
+      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto overscroll-contain">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
-          className="bg-[#0f0e0e] border-2 border-[#e0141f] w-full max-w-xl shadow-2xl overflow-hidden font-mono text-neutral-200"
+          className="bg-[#0f0e0e] border-2 border-[#e0141f] w-full max-w-xl my-auto max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden font-mono text-neutral-200"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 bg-[#171515] border-b border-neutral-800">
-            <div className="flex items-center gap-2.5">
-              <Hammer className="w-4 h-4 text-[#e0141f]" />
-              <div>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  HUD MODO TALLER // CONTADOR TÁCTICO DE VUELTAS
+          <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#171515] border-b border-neutral-800 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+              <Hammer className="w-4 h-4 text-[#e0141f] shrink-0" />
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider truncate">
+                  HUD MODO TALLER // VUELTAS
                 </h3>
-                <p className="text-[10px] text-[#ffb4ab] uppercase">
+                <p className="text-[10px] text-[#ffb4ab] uppercase truncate">
                   {currentPatternTitle}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setSoundEnabled(!soundEnabled)}
                 title={soundEnabled ? 'Silenciar clics' : 'Activar sonido mecánico'}
-                className="p-1.5 text-neutral-400 hover:text-white bg-[#221c1c] border border-neutral-700"
+                aria-label="Alternar sonido mecánico"
+                className="w-11 h-11 flex items-center justify-center text-neutral-400 hover:text-white bg-[#221c1c] border border-neutral-700 transition-colors"
               >
                 {soundEnabled ? <Volume2 className="w-4 h-4 text-[#39ff14]" /> : <VolumeX className="w-4 h-4 text-neutral-500" />}
               </button>
               <button
                 onClick={onClose}
-                className="p-1.5 text-neutral-400 hover:text-white bg-[#221c1c] hover:bg-[#e0141f] border border-neutral-700 transition-colors"
+                aria-label="Cerrar HUD taller"
+                className="w-11 h-11 flex items-center justify-center text-neutral-400 hover:text-white bg-[#221c1c] hover:bg-[#e0141f] border border-neutral-700 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -167,10 +169,10 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
           </div>
 
           {/* Navegación por Pestañas */}
-          <div className="flex border-b border-neutral-800 bg-[#121111] text-xs">
+          <div className="flex border-b border-neutral-800 bg-[#121111] text-xs shrink-0">
             <button
               onClick={() => setActiveTab('counter')}
-              className={`flex-1 py-2.5 text-center font-bold tracking-wider transition-colors ${
+              className={`flex-1 min-h-[44px] flex items-center justify-center px-2 py-2 text-center font-bold tracking-wider transition-colors ${
                 activeTab === 'counter'
                   ? 'bg-[#1e1717] text-[#ffb4ab] border-b-2 border-[#e0141f]'
                   : 'text-neutral-400 hover:text-white'
@@ -180,23 +182,23 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
             </button>
             <button
               onClick={() => setActiveTab('glossary')}
-              className={`flex-1 py-2.5 text-center font-bold tracking-wider transition-colors ${
+              className={`flex-1 min-h-[44px] flex items-center justify-center px-2 py-2 text-center font-bold tracking-wider transition-colors ${
                 activeTab === 'glossary'
                   ? 'bg-[#1e1717] text-[#ffb4ab] border-b-2 border-[#e0141f]'
                   : 'text-neutral-400 hover:text-white'
               }`}
             >
-              2. GLOSARIO DE PUNTOS
+              2. GLOSARIO
             </button>
             <button
               onClick={() => setActiveTab('notes')}
-              className={`flex-1 py-2.5 text-center font-bold tracking-wider transition-colors ${
+              className={`flex-1 min-h-[44px] flex items-center justify-center px-2 py-2 text-center font-bold tracking-wider transition-colors ${
                 activeTab === 'notes'
                   ? 'bg-[#1e1717] text-[#ffb4ab] border-b-2 border-[#e0141f]'
                   : 'text-neutral-400 hover:text-white'
               }`}
             >
-              3. NOTAS DE TENSIÓN
+              3. NOTAS
             </button>
           </div>
 
@@ -271,14 +273,18 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setCurrentStitch(s => Math.max(1, s - 1))}
-                    className="w-8 h-8 bg-[#201c1c] text-white flex items-center justify-center border border-neutral-700"
+                    aria-label="Restar un punto"
+                    className="w-10 h-10 min-w-[40px] min-h-[40px] bg-[#201c1c] text-white flex items-center justify-center border border-neutral-700 active:scale-95 transition-all"
                   >
                     -
                   </button>
                   <button
+                    type="button"
                     onClick={handleNextStitch}
-                    className="px-4 py-2 bg-[#39ff14] text-black font-bold text-xs uppercase flex items-center gap-1 active:scale-95"
+                    aria-label="Avanzar un punto"
+                    className="min-h-[40px] px-4 py-2 bg-[#39ff14] text-black font-bold text-xs uppercase flex items-center gap-1 active:scale-95 transition-all shadow-md"
                   >
                     <span>+1 PUNTO</span>
                   </button>
@@ -288,13 +294,14 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
               {/* Reset */}
               <div className="flex justify-between items-center pt-2">
                 <button
+                  type="button"
                   onClick={handleReset}
-                  className="text-xs text-neutral-500 hover:text-red-400 flex items-center gap-1.5 transition-colors"
+                  className="min-h-[44px] text-xs text-neutral-400 hover:text-red-400 flex items-center gap-1.5 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>REINICIAR VUELTAS</span>
                 </button>
-                <span className="text-[11px] text-neutral-500">
+                <span className="text-[11px] text-neutral-500 hidden sm:inline">
                   Progreso guardado automáticamente en el navegador.
                 </span>
               </div>
@@ -304,7 +311,7 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
 
           {/* Tab 2: Glosario de Puntos */}
           {activeTab === 'glossary' && (
-            <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
+            <div data-lenis-prevent="true" className="p-5 space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar">
               <p className="text-xs text-[#ffb4ab] mb-2">
                 DICCIONARIO DE ABREVIATURAS USUALES EN PATRONES KUROPUNK:
               </p>
@@ -336,7 +343,7 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
                   value={projectNotes}
                   onChange={(e) => setProjectNotes(e.target.value)}
                   placeholder="Ej: Usé aguja de 2.2mm para mayor firmeza en el torso. En la vuelta 15 cambiar al hilo rojo carbón..."
-                  className="w-full bg-[#141212] border border-neutral-700 p-3 text-xs text-white outline-none focus:border-[#e0141f] resize-none"
+                  className="w-full bg-[#141212] border border-neutral-700 p-3 text-base sm:text-xs min-h-[120px] text-white outline-none focus:border-[#e0141f] resize-none"
                 />
               </div>
               <p className="text-[11px] text-neutral-400">

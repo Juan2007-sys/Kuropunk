@@ -1,6 +1,7 @@
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const rawApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
+const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 const ALL_LOCAL_PRODUCTS = [...PRODUCTS, ...PUNTO_CRUZ_PRODUCTS, ...PATRONES_PRODUCTS];
 
@@ -94,11 +95,12 @@ export async function getProductById(id) {
  * Orders Service con propagación de errores de NestJS y timeout móvil adecuado (12s)
  */
 export async function submitOrder(orderData) {
+  const targetUrl = `${API_BASE_URL}/orders`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
 
   try {
-    const res = await fetch(`${API_BASE_URL}/orders`, {
+    const res = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,9 +114,13 @@ export async function submitOrder(orderData) {
     const json = await res.json().catch(() => null);
 
     if (!res.ok) {
-      // Extraer mensaje emitido por los ValidationPipes de NestJS
-      const msg = json?.message || json?.error || `Error en el servidor (${res.status})`;
-      const formattedMsg = Array.isArray(msg) ? msg.join('. ') : msg;
+      // Extraer mensaje emitido por los ValidationPipes o filtros de NestJS
+      const rawMsg = json?.error?.message || json?.message || json?.error || `Error en el servidor (${res.status})`;
+      const formattedMsg = typeof rawMsg === 'string'
+        ? rawMsg
+        : Array.isArray(rawMsg)
+          ? rawMsg.join('. ')
+          : (rawMsg?.message || JSON.stringify(rawMsg));
       const error = new Error(formattedMsg);
       error.status = res.status;
       error.details = json;
@@ -130,6 +136,7 @@ export async function submitOrder(orderData) {
     return result;
   } catch (err) {
     clearTimeout(timeoutId);
+    console.error('[api.js submitOrder] caught error:', err);
     if (err.name === 'AbortError') {
       throw new Error('La conexión tardó demasiado tiempo. Verifica tu red móvil y reintenta.');
     }

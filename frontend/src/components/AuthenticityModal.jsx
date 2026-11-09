@@ -104,50 +104,51 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md">
+      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto overscroll-contain">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-[#0f0e0e] border-2 border-[#e0141f] w-full max-w-2xl shadow-2xl overflow-hidden font-body-md text-neutral-200"
+          className="bg-[#0f0e0e] border-2 border-[#e0141f] w-full max-w-2xl my-auto max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden font-body-md text-neutral-200"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 bg-[#161414] border-b border-neutral-800">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 bg-[#161414] border-b border-neutral-800 shrink-0">
             <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-5 h-5 text-[#e0141f]" />
+              <ShieldCheck className="w-5 h-5 text-[#e0141f] shrink-0" />
               <div>
-                <h3 className="font-headline-md text-lg text-white uppercase tracking-wider">
-                  VERIFICADOR DE AUTENTICIDAD // BÓVEDA KUROPUNK
+                <h3 className="font-headline-md text-base sm:text-lg text-white uppercase tracking-wider">
+                  VERIFICADOR DE AUTENTICIDAD // BÓVEDA
                 </h3>
-                <p className="text-[11px] font-mono text-[#ffb4ab]">
-                  CERTIFICADO OFICIAL DE PIEZAS FÍSICAS Y EDICIONES NUMERADAS
+                <p className="text-[10px] sm:text-[11px] font-mono text-[#ffb4ab]">
+                  CERTIFICADO OFICIAL DE PIEZAS FÍSICAS Y EDICIONES
                 </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="p-1.5 text-neutral-400 hover:text-white bg-[#221c1c] hover:bg-[#e0141f] border border-neutral-700 transition-colors"
+              aria-label="Cerrar verificador"
+              className="w-11 h-11 -mr-2 flex items-center justify-center text-neutral-400 hover:text-white bg-[#221c1c] hover:bg-[#e0141f] border border-neutral-700 transition-colors shrink-0"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Buscador de Serial */}
-          <div className="p-6 bg-[#121010] border-b border-neutral-800">
-            <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="p-4 sm:p-6 bg-[#121010] border-b border-neutral-800 shrink-0">
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-grow">
                 <input
                   type="text"
-                  placeholder="Ingresa el serial (ej: RX-00-042, RX-01-088)..."
+                  placeholder="Ingresa el serial (ej: RX-00-042)..."
                   value={querySerial}
                   onChange={(e) => setQuerySerial(e.target.value)}
-                  className="w-full bg-[#181616] border border-neutral-700 px-4 py-2.5 font-mono text-xs sm:text-sm text-white uppercase outline-none focus:border-[#e0141f]"
+                  className="w-full min-h-[44px] bg-[#181616] border border-neutral-700 px-4 py-2.5 font-mono text-base sm:text-sm text-white uppercase outline-none focus:border-[#e0141f]"
                 />
               </div>
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-[#e0141f] hover:bg-red-700 text-white font-mono text-xs uppercase font-bold tracking-wider flex items-center gap-2 transition-colors"
+                className="min-h-[44px] px-6 py-2.5 bg-[#e0141f] hover:bg-red-700 text-white font-mono text-xs uppercase font-bold tracking-wider flex items-center justify-center gap-2 transition-colors active:scale-95 shrink-0"
               >
                 <Search className="w-4 h-4" />
                 <span>CONSULTAR</span>
@@ -174,7 +175,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
           </div>
 
           {/* Resultado del Certificado (Holograma Digital) */}
-          <div className="p-6 overflow-y-auto max-h-[60vh]">
+          <div data-lenis-prevent="true" className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar">
             {searchResult ? (
               <div className="relative border-2 border-[#e0141f] bg-gradient-to-b from-[#181515] to-[#0d0c0c] p-6 shadow-2xl overflow-hidden">
                 

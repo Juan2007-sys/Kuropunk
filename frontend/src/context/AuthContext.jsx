@@ -23,10 +23,15 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [redirectIntent, setRedirectIntent] = useState(null);
 
-  // Development fallback user to guarantee immediate interactivity in dev mode
+  // Development fallback user restricted strictly to DEV environment (disabled in production)
   const [devDemoUser, setDevDemoUser] = useState(() => {
-    const saved = localStorage.getItem('kuropunk_demo_auth');
-    return saved ? JSON.parse(saved) : null;
+    if (!import.meta.env.DEV) return null;
+    try {
+      const saved = localStorage.getItem('kuropunk_demo_auth');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
 
   useEffect(() => {
@@ -130,32 +135,19 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Email / Password Login
+  // Email / Password Login (Zero-Trust: Verifica credenciales reales en Firebase Auth)
   const loginWithEmail = async (email, password) => {
     const cleanEmail = (email || '').trim().toLowerCase();
 
-    // 1. Acceso Directo de Administrador Maestro KuroPunk
-    if (cleanEmail === 'admin@kuropunk.co' || cleanEmail === 'admin') {
-      const adminUser = {
-        uid: 'admin_kuro_master',
-        email: 'admin@kuropunk.co',
-        displayName: 'Administrador KuroPunk',
-        phoneNumber: '+573114377996',
-        role: 'admin',
-        isAdmin: true
-      };
-      localStorage.setItem('kuropunk_demo_auth', JSON.stringify(adminUser));
-      setDevDemoUser(adminUser);
-      setCurrentUser(adminUser);
-      setUserRole('admin');
-      return adminUser;
+    if (!cleanEmail || !password) {
+      throw new Error('Debes ingresar correo y contraseña.');
     }
 
     try {
-      const res = await signInWithEmailAndPassword(auth, email, password);
+      const res = await signInWithEmailAndPassword(auth, cleanEmail, password);
       const profile = await syncUserProfile(res.user);
       const role = await getUserRole(res.user);
-      const isAdminRole = role === 'admin' || cleanEmail.includes('admin');
+      const isAdminRole = role === 'admin';
 
       setUserRole(isAdminRole ? 'admin' : role);
       const userObj = {
@@ -169,22 +161,6 @@ export function AuthProvider({ children }) {
       setCurrentUser(userObj);
       return userObj;
     } catch (error) {
-      // Fallback seguro si Firebase Auth rechaza la operación por no tener el provider activo en consola
-      if (cleanEmail.includes('admin')) {
-        const fallbackAdmin = {
-          uid: 'admin_kuro_master',
-          email: cleanEmail,
-          displayName: 'Administrador KuroPunk',
-          phoneNumber: '+573114377996',
-          role: 'admin',
-          isAdmin: true
-        };
-        localStorage.setItem('kuropunk_demo_auth', JSON.stringify(fallbackAdmin));
-        setDevDemoUser(fallbackAdmin);
-        setCurrentUser(fallbackAdmin);
-        setUserRole('admin');
-        return fallbackAdmin;
-      }
       console.error('[KuroPunk Auth] Email sign-in failed:', error);
       throw error;
     }
