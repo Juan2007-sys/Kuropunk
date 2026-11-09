@@ -4,10 +4,12 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && npm run seed:prod
     startCommand: npm run start:prod
     envVars:
       - key: NODE_ENV
         value: production
       - key: CORS_ORIGIN
         value: https://frontend-cyan-nu-86.vercel.app
+      - key: ADMIN_SECRET_KEY
+        value: kuropunk_admin_secret_2026
