@@ -131,6 +131,13 @@ export function AuthProvider({ children }) {
         customErr.code = 'auth/configuration-not-found';
         throw customErr;
       }
+      if (error?.code === 'auth/unauthorized-domain') {
+        const customErr = new Error(
+          'El dominio de tu tienda no está autorizado en Firebase. Agrega "kuropunk.vercel.app" en Firebase Console > Authentication > Settings > Authorized domains.'
+        );
+        customErr.code = 'auth/unauthorized-domain';
+        throw customErr;
+      }
       throw error;
     }
   };
