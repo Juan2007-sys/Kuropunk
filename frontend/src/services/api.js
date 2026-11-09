@@ -1,6 +1,9 @@
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 
-const rawApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
+const rawApiUrl = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://kuropunk-backend.onrender.com/api' : 'http://localhost:4000/api')
+).replace(/\/+$/, '');
 const API_BASE_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 const ALL_LOCAL_PRODUCTS = [...PRODUCTS, ...PUNTO_CRUZ_PRODUCTS, ...PATRONES_PRODUCTS];
