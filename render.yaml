@@ -10,6 +10,6 @@ services:
       - key: NODE_ENV
         value: production
       - key: CORS_ORIGIN
-        value: https://frontend-cyan-nu-86.vercel.app
+        value: https://kuropunk.vercel.app,https://frontend-cyan-nu-86.vercel.app
       - key: ADMIN_SECRET_KEY
         value: kuropunk_admin_secret_2026
