@@ -375,7 +375,6 @@ export function downloadReceiptPDF(order) {
 
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #5e3f3c; text-align: right; font-size: 13px; line-height: 1.8;">
       <div>SUBTOTAL: ${formatCOP(order.subtotal || order.total)}</div>
-      <div>DOMICILIO PERSONAL: ${Number(order.shippingCost) > 0 ? formatCOP(order.shippingCost) : '<span style="color:#4ade80;">GRATIS</span>'}</div>
       <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">TOTAL A PAGAR AL RECIBIR: ${formatCOP(order.total)}</div>
       <div style="font-size: 11px; color: #888; margin-top: 4px;">MODALIDAD: Pago Contraentrega (Efectivo o Transferencia Nequi / Daviplata al verificar la pieza)</div>
     </div>

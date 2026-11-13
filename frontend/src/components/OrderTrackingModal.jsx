@@ -44,8 +44,8 @@ const TIMELINE_STEPS = [
   },
   {
     key: 'EN_RUTA',
-    title: '4. En Ruta // Entrega Personal',
-    desc: 'El artesano o domiciliario va en camino a tu dirección.',
+    title: '4. Entrega Personal Acordada',
+    desc: 'Tu pedido está listo para entrega personal en mano.',
     icon: Bike,
   },
   {

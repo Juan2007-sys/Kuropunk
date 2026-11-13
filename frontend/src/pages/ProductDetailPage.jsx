@@ -73,6 +73,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
   const effectivePrice = product.price;
 
   useEffect(() => {
+    setQuantity(1);
     if (product?.image) {
       setActiveImage(product.image);
     }
@@ -397,7 +398,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                   </span>
                   <button
                     type="button"
-                    onClick={() => setQuantity((q) => Math.min(product.stock || 10, q + 1))}
+                    onClick={() => setQuantity((q) => Math.min(product.stock ?? 10, q + 1))}
                     aria-label="Aumentar cantidad"
                     className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center text-base text-neutral-200 hover:text-white hover:bg-neutral-800 active:scale-95 transition-all"
                   >
@@ -714,7 +715,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
           className="shrink-0 min-h-[44px] px-5 py-2.5 bg-[#FF0033] hover:bg-red-700 text-white font-mono text-xs uppercase font-bold tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
         >
           <ShoppingCart className="w-3.5 h-3.5" />
-          <span>AGREGAR</span>
+          <span>{isSoldOut ? 'AVISARME' : 'AGREGAR'}</span>
         </button>
       </div>
 

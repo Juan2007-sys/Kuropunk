@@ -766,7 +766,8 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                                 <button
                                   type="button"
                                   onClick={() => updateQuantity(item.id, 1)}
-                                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-lg text-white hover:bg-neutral-700 active:bg-neutral-600 transition-colors"
+                                  disabled={typeof item.stock === 'number' && item.quantity >= item.stock}
+                                  className="w-10 h-10 min-w-[40px] min-h-[40px] flex items-center justify-center text-lg text-white hover:bg-neutral-700 active:bg-neutral-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                   aria-label="Sumar una unidad"
                                 >
                                   +
@@ -963,7 +964,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                       <div className="p-3 bg-[#e0141f]/15 border-l-4 border-[#e0141f] font-mono text-xs text-[#ffb4ab] space-y-1">
                         <div className="font-bold text-white flex items-center gap-1.5 uppercase">
                           <AlertTriangle className="w-4 h-4 text-[#e0141f] shrink-0" />
-                          <span>Regla de Producción (> $50.000 COP)</span>
+                          <span>Regla de Producción ({'>'} $50.000 COP)</span>
                         </div>
                         <p className="text-[11px] leading-relaxed text-neutral-200">
                           Para pedidos superiores a $50.000 COP se requiere un <strong>anticipo mínimo del 20%</strong> para agendar tu muñeco en la cola de producción.

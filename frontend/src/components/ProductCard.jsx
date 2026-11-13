@@ -16,7 +16,6 @@ export const ProductCard = ({ product, onSelectProduct, delayIndex = 0 }) => {
       return;
     }
     addToCart(product, 1);
-    showToast(`AGREGADO AL CARRITO // ${product.title.toUpperCase()}`, "success");
   };
 
   // Discount percentage calculation

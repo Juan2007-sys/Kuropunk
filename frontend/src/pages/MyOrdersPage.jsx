@@ -121,7 +121,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
         <div className="space-y-8">
           {orders.map((order) => {
             const currentStepIdx = getStepIndex(order.status);
-            const isCancelled = order.status === 'cancelled';
+            const isCancelled = String(order.status || '').toUpperCase().includes('CANCEL');
 
             return (
               <div

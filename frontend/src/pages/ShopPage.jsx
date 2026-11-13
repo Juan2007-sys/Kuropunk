@@ -56,42 +56,36 @@ export const ShopPage = ({ onSelectProduct }) => {
   const amigurumisBase = useMemo(() => {
     const activeLocal = PRODUCTS.filter(p => p.isActive !== false);
     if (!firestoreProducts || firestoreProducts.length === 0) return activeLocal;
+    const allFirestoreIds = new Set(firestoreProducts.map(p => p.id));
     const liveAmis = firestoreProducts.filter(p => 
       p.isActive !== false &&
       (p.technique === 'amigurumi' || (!p.technique && p.category !== 'Punto de Cruz' && p.category !== 'Patrones'))
     );
-    if (liveAmis.length === 0) return activeLocal;
-
-    const liveIds = new Set(liveAmis.map(p => p.id));
-    const fallbacksNotOverridden = activeLocal.filter(p => !liveIds.has(p.id));
+    const fallbacksNotOverridden = activeLocal.filter(p => !allFirestoreIds.has(p.id));
     return [...liveAmis, ...fallbacksNotOverridden];
   }, [firestoreProducts]);
 
   const puntoCruzBase = useMemo(() => {
     const activeLocal = PUNTO_CRUZ_PRODUCTS.filter(p => p.isActive !== false);
     if (!firestoreProducts || firestoreProducts.length === 0) return activeLocal;
+    const allFirestoreIds = new Set(firestoreProducts.map(p => p.id));
     const liveCruz = firestoreProducts.filter(p => 
       p.isActive !== false &&
       (p.technique === 'punto_cruz' || p.category === 'Punto de Cruz')
     );
-    if (liveCruz.length === 0) return activeLocal;
-
-    const liveIds = new Set(liveCruz.map(p => p.id));
-    const fallbacksNotOverridden = activeLocal.filter(p => !liveIds.has(p.id));
+    const fallbacksNotOverridden = activeLocal.filter(p => !allFirestoreIds.has(p.id));
     return [...liveCruz, ...fallbacksNotOverridden];
   }, [firestoreProducts]);
 
   const patronesBase = useMemo(() => {
     const activeLocal = PATRONES_PRODUCTS.filter(p => p.isActive !== false);
     if (!firestoreProducts || firestoreProducts.length === 0) return activeLocal;
+    const allFirestoreIds = new Set(firestoreProducts.map(p => p.id));
     const livePatrones = firestoreProducts.filter(p => 
       p.isActive !== false &&
       (p.technique === 'patron' || p.technique === 'patron_pdf' || p.category === 'Patrones' || p.isPattern)
     );
-    if (livePatrones.length === 0) return activeLocal;
-
-    const liveIds = new Set(livePatrones.map(p => p.id));
-    const fallbacksNotOverridden = activeLocal.filter(p => !liveIds.has(p.id));
+    const fallbacksNotOverridden = activeLocal.filter(p => !allFirestoreIds.has(p.id));
     return [...livePatrones, ...fallbacksNotOverridden];
   }, [firestoreProducts]);
 

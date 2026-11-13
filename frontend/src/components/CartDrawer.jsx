@@ -7,10 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
   const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, subtotal, totalItems } = useCart();
 
-  const shippingThreshold = 150000;
-  const progressPercent = Math.min(100, (subtotal / shippingThreshold) * 100);
-  const remainingForFreeShipping = Math.max(0, shippingThreshold - subtotal);
-
   const handleBrowseCatalog = () => {
     setIsCartOpen(false);
     if (onExploreCatalog) {
@@ -60,24 +56,6 @@ export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
                 >
                   <X className="w-5 h-5" />
                 </button>
-              </div>
-
-              {/* Free Shipping Tier */}
-              <div className="p-4 bg-[#211f1f] border-b border-[#5e3f3c]/60 text-xs">
-                <div className="flex justify-between font-label-caps text-[#c7c6c2] mb-1.5">
-                  <span>
-                    {remainingForFreeShipping === 0
-                      ? '✓ DOMICILIO GRATIS DESBLOQUEADO'
-                      : `AGREGA ${formatCOP(remainingForFreeShipping)} PARA DOMICILIO GRATIS`}
-                  </span>
-                  <span className="text-[#ffb4ab] font-bold">{Math.round(progressPercent)}%</span>
-                </div>
-                <div className="w-full h-1.5 bg-[#141313] overflow-hidden">
-                  <div
-                    className="h-full bg-[#e0141f] transition-all duration-500"
-                    style={{ width: `${progressPercent}%` }}
-                  ></div>
-                </div>
               </div>
 
               {/* Item List */}
@@ -158,15 +136,23 @@ export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
                             </span>
                             <button
                               onClick={() => updateQuantity(item.id, 1)}
-                              className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center text-[#e6e1e1] hover:text-[#ffb4ab] hover:bg-[#141313] transition-colors"
+                              disabled={typeof item.stock === 'number' && item.quantity >= item.stock}
+                              className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] flex items-center justify-center text-[#e6e1e1] hover:text-[#ffb4ab] hover:bg-[#141313] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                               aria-label="Aumentar cantidad"
                             >
                               <Plus className="w-4 h-4" />
                             </button>
                           </div>
-                          <span className="font-accent-tag text-sm text-[#ffb4ab]">
-                            {formatCOP(item.price * item.quantity)}
-                          </span>
+                          <div className="text-right">
+                            <span className="font-accent-tag text-sm text-[#ffb4ab] block">
+                              {formatCOP(item.price * item.quantity)}
+                            </span>
+                            {typeof item.stock === 'number' && (
+                              <span className="font-mono text-[10px] text-neutral-400">
+                                Stock disp.: {item.stock}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -182,16 +168,10 @@ export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
                       <span>Subtotal</span>
                       <span className="font-mono text-[#e6e1e1] font-bold">{formatCOP(subtotal)}</span>
                     </div>
-                    <div className="flex justify-between text-[#e7bcb8]/70">
-                      <span>Domicilio Personalizado</span>
-                      <span className="font-mono text-[#e6e1e1]">
-                        {remainingForFreeShipping === 0 ? 'GRATIS' : formatCOP(15000)}
-                      </span>
-                    </div>
                     <div className="flex justify-between text-base pt-2 border-t border-[#5e3f3c] font-bold">
-                      <span className="font-headline-md uppercase text-[#e6e1e1]">Total a Pagar en Puerta</span>
+                      <span className="font-headline-md uppercase text-[#e6e1e1]">Total del Pedido</span>
                       <span className="font-headline-md text-2xl text-[#ffb4ab]">
-                        {formatCOP(subtotal + (remainingForFreeShipping === 0 ? 0 : 15000))}
+                        {formatCOP(subtotal)}
                       </span>
                     </div>
                   </div>
@@ -209,7 +189,7 @@ export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
 
                   <div className="flex items-center justify-center gap-2 text-[10px] text-[#8a8a86] font-mono uppercase">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#ffb4ab]" />
-                    Despacho Táctico Contraentrega // Pago al Recibir en Mano
+                    Entrega Acordada // Pago al Recibir en Mano
                   </div>
                 </div>
               )}
