@@ -5,14 +5,17 @@ import {
   subscribeContactMessages,
   updateOrderStatusInFirestore,
   verifyOrderDepositInFirestore,
+  deleteOrderInFirestore,
+  clearAllOrdersInFirestore,
   saveProductInFirestore,
   deleteProductInFirestore,
   uploadProductImage,
   subscribeProducts,
-  syncCatalogToFirestore
+  syncCatalogToFirestore,
+  isFirebaseConfigured
 } from '../services/firebase';
 import { formatCOP, generateAdminToCustomerWhatsAppUrl } from '../utils/formatters';
-import { getContactMessages, getAllOrders, verifyOrderDeposit } from '../services/api';
+import { getContactMessages, getAllOrders, verifyOrderDeposit, deleteOrderApi, clearAllOrdersApi } from '../services/api';
 import { PRODUCTS as fallbackCatalog, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 import {
   Package,
@@ -121,28 +124,6 @@ export function AdminPage({ onBackToShop }) {
 
   // Real-time Orders Subscription + Backend Sync
   useEffect(() => {
-    const defaultOrders = [
-      {
-        id: 'KP-829103',
-        customerData: {
-          name: 'Santiago Vélez (QA)',
-          phone: '+573015690382',
-          shippingAddress: 'Carrera 7 # 72 - 41, Chapinero (Bogotá)'
-        },
-        items: [{ title: 'Jungkook con Pijama de Cooky', quantity: 1, unitPrice: 50000 }],
-        totalAmount: 50000,
-        total: 50000,
-        requiresDeposit: false,
-        depositBaseAmount: 0,
-        depositRequiredAmount: 0,
-        remainingBalance: 50000,
-        paymentStatus: 'NO_REQUIERE',
-        status: 'EN_COLA',
-        queuedAt: '2026-11-09T10:00:00.000Z',
-        trackingNumber: 'KURO-TRK-77X'
-      }
-    ];
-
     const mergeOrdersLists = (listA = [], listB = []) => {
       const map = new Map();
       for (const item of [...listA, ...listB]) {
@@ -152,17 +133,22 @@ export function AdminPage({ onBackToShop }) {
       return Array.from(map.values());
     };
 
-    getAllOrders()
-      .then((backendOrders) => {
-        if (Array.isArray(backendOrders) && backendOrders.length > 0) {
-          setOrders((prev) => mergeOrdersLists(backendOrders, prev));
+    if (!isFirebaseConfigured) {
+      getAllOrders()
+        .then((backendOrders) => {
+          if (Array.isArray(backendOrders) && backendOrders.length > 0) {
+            setOrders(backendOrders);
+          } else {
+            setOrders([]);
+          }
           setLoadingOrders(false);
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {
+          setLoadingOrders(false);
+        });
+    }
 
     const timer = setTimeout(() => {
-      setOrders((prev) => (prev.length > 0 ? prev : defaultOrders));
       setLoadingOrders(false);
     }, 800);
 
@@ -177,14 +163,13 @@ export function AdminPage({ onBackToShop }) {
             });
           }
           prevOrderCountRef.current = liveOrders.length;
-          setOrders((prev) => mergeOrdersLists(liveOrders, prev));
+          setOrders(liveOrders);
         } else {
-          setOrders((prev) => (prev.length > 0 ? prev : defaultOrders));
+          setOrders([]);
         }
         setLoadingOrders(false);
       },
       () => {
-        setOrders((prev) => (prev.length > 0 ? prev : defaultOrders));
         setLoadingOrders(false);
       }
     );
@@ -378,6 +363,57 @@ export function AdminPage({ onBackToShop }) {
     } finally {
       setUpdatingOrderId(null);
     }
+  };
+
+  const handleDeleteOrder = (orderId) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'ELIMINAR ORDEN',
+      message: `¿Estás seguro de eliminar permanentemente la orden #${orderId}? Esta acción eliminará el pedido de la base de datos y de la memoria local.`,
+      confirmText: 'SÍ, ELIMINAR',
+      cancelText: 'CANCELAR',
+      isDanger: true,
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await deleteOrderInFirestore(orderId);
+          await deleteOrderApi(orderId);
+          setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
+          if (selectedOrderDetail && String(selectedOrderDetail.id) === String(orderId)) {
+            setSelectedOrderDetail(null);
+          }
+          toast.success(`Orden #${orderId} eliminada correctamente.`);
+        } catch (err) {
+          console.error('[AdminPage Delete Order Error]', err);
+          toast.error(`Error al eliminar orden: ${err?.message || err}`);
+        }
+      }
+    });
+  };
+
+  const handleClearAllOrders = () => {
+    setConfirmConfig({
+      isOpen: true,
+      title: 'REINICIAR ÓRDENES A CERO',
+      message: '¿Estás seguro de eliminar TODAS las órdenes del sistema? El contador quedará en cero pedidos.',
+      confirmText: 'SÍ, DEJAR EN CEROS',
+      cancelText: 'CANCELAR',
+      isDanger: true,
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          const allIds = orders.map((o) => o.id);
+          await clearAllOrdersInFirestore(allIds);
+          await clearAllOrdersApi();
+          setOrders([]);
+          setSelectedOrderDetail(null);
+          toast.success('Todas las órdenes han sido eliminadas. Sistema en ceros.');
+        } catch (err) {
+          console.error('[AdminPage Clear All Error]', err);
+          toast.error(`Error al vaciar órdenes: ${err?.message || err}`);
+        }
+      }
+    });
   };
 
   // Separación estricta Pre-Cola vs Cola de Producción Oficial
@@ -730,11 +766,33 @@ export function AdminPage({ onBackToShop }) {
               <Layers className="w-4 h-4" />
               <span>Ver Ambas Secciones Separadas</span>
             </button>
+
+            {orders.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllOrders}
+                className="ml-auto px-4 py-2.5 font-mono text-xs uppercase font-bold border border-red-700/80 bg-red-950/70 hover:bg-red-900 text-red-200 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+                title="Eliminar todas las órdenes y reiniciar contador a ceros"
+              >
+                <Trash2 className="w-4 h-4 text-red-400" />
+                <span>Vaciar Todas Las Órdenes (Dejar en Cero)</span>
+              </button>
+            )}
           </div>
 
           {loadingOrders ? (
             <div className="py-20 text-center font-mono text-xs text-[#ffb4ab]">
               CARGANDO ÓRDENES EN TIEMPO REAL...
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="py-16 text-center bg-[#141313] border border-[#5e3f3c] p-8 space-y-4">
+              <Package className="w-14 h-14 text-neutral-600 mx-auto" />
+              <h3 className="font-headline-md text-2xl text-white uppercase tracking-wider">
+                0 PEDIDOS REGISTRADOS
+              </h3>
+              <p className="font-mono text-xs text-neutral-400 max-w-md mx-auto">
+                No hay ninguna orden en el sistema. Los nuevos pedidos realizados por clientes aparecerán aquí automáticamente en tiempo real.
+              </p>
             </div>
           ) : (
             <div className="space-y-8">
@@ -884,6 +942,16 @@ export function AdminPage({ onBackToShop }) {
                                   <span>WA</span>
                                 </a>
                               )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteOrder(order.id)}
+                                className="py-2.5 px-3 bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-red-300 font-bold text-[11px] uppercase flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                                title="Eliminar orden permanentemente"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Eliminar</span>
+                              </button>
                             </div>
                           </div>
                         );
@@ -1056,6 +1124,14 @@ export function AdminPage({ onBackToShop }) {
                                   >
                                     Ficha
                                   </button>
+                                  <button
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    className="px-2 py-1 bg-red-950/80 border border-red-700/60 hover:bg-red-900 text-red-300 text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                    title="Eliminar orden permanentemente"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>Eliminar</span>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1151,17 +1227,26 @@ export function AdminPage({ onBackToShop }) {
                   </div>
                 </div>
 
-                {/* Botón WhatsApp directo con el cliente */}
-                <div className="pt-2">
+                {/* Acciones directo con el cliente / Eliminar */}
+                <div className="flex gap-2 pt-2">
                   <a
                     href={`https://wa.me/57${String(selectedOrderDetail.customerData?.phone || selectedOrderDetail.phone || '').replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(selectedOrderDetail.customerData?.name || selectedOrderDetail.customerName || 'Cliente')},%20te%20escribimos%20del%20taller%20KuroPunk%20sobre%20tu%20pedido%20%23${selectedOrderDetail.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-2.5 bg-[#25D366] hover:bg-[#1fa851] text-black font-bold uppercase flex items-center justify-center gap-2 shadow-lg"
+                    className="flex-1 py-2.5 bg-[#25D366] hover:bg-[#1fa851] text-black font-bold uppercase flex items-center justify-center gap-2 shadow-lg text-xs"
                   >
                     <MessageSquare className="w-4 h-4 fill-black" />
-                    <span>Escribir al Cliente por WhatsApp</span>
+                    <span>Escribir por WhatsApp</span>
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteOrder(selectedOrderDetail.id)}
+                    className="px-4 py-2.5 bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-red-300 font-bold uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-xs"
+                    title="Eliminar esta orden permanentemente"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Eliminar Orden</span>
+                  </button>
                 </div>
               </div>
             </div>

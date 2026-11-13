@@ -31,32 +31,8 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    // Fast fallback timer for offline / demo mode
+    // Fast fallback timer
     const timer = setTimeout(() => {
-      const localOrder = localStorage.getItem('kuropunk_last_order');
-      if (localOrder) {
-        try {
-          setOrders([JSON.parse(localOrder)]);
-        } catch (e) {}
-      } else {
-        setOrders([
-          {
-            id: 'KP-940218',
-            customerData: {
-              name: currentUser.displayName || 'Santiago Vélez',
-              phone: currentUser.phoneNumber || '+57 301 569 0382',
-              shippingAddress: 'Carrera 7 # 72 - 41, Apto 501, Chapinero (Bogotá)'
-            },
-            items: [
-              { title: 'The Wanderer - Amigurumi Flagship', quantity: 1, unitPrice: 145000 },
-              { title: 'Patrón: Scrap Bunny (PDF)', quantity: 1, unitPrice: 20000 }
-            ],
-            totalAmount: 165000,
-            status: 'in_production',
-            trackingNumber: 'KURO-TRK-88XP'
-          }
-        ]);
-      }
       setLoading(false);
     }, 800);
 
@@ -65,9 +41,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
       currentUser.uid,
       (liveOrders) => {
         clearTimeout(timer);
-        if (liveOrders && liveOrders.length > 0) {
-          setOrders(liveOrders);
-        }
+        setOrders(liveOrders || []);
         setLoading(false);
       },
       () => {

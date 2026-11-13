@@ -312,6 +312,30 @@ export async function getAllOrders() {
   return Array.isArray(result) ? result : (result?.orders || []);
 }
 
+export async function deleteOrderApi(orderId) {
+  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
+  try {
+    await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+      method: 'DELETE',
+      headers: { 'x-admin-key': adminKey },
+    });
+  } catch (e) {
+    console.warn('[API deleteOrder error]', e);
+  }
+}
+
+export async function clearAllOrdersApi() {
+  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
+  try {
+    await fetch(`${API_BASE_URL}/orders`, {
+      method: 'DELETE',
+      headers: { 'x-admin-key': adminKey },
+    });
+  } catch (e) {
+    console.warn('[API clearAllOrders error]', e);
+  }
+}
+
 function syncOrderToLocalCache(updatedOrder) {
   if (!updatedOrder || !updatedOrder.id) return;
   try {

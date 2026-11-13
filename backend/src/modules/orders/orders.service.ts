@@ -479,4 +479,23 @@ export class OrdersService {
 
     return updatedOrder;
   }
+
+  async remove(id: string): Promise<{ success: boolean; id: string }> {
+    const order = await this.orderRepo.findOne({
+      where: { id },
+      relations: ['items'],
+    });
+    if (!order) {
+      return { success: true, id };
+    }
+    await this.orderItemRepo.delete({ order: { id } });
+    await this.orderRepo.delete({ id });
+    return { success: true, id };
+  }
+
+  async clearAll(): Promise<{ success: boolean; count: number }> {
+    await this.orderItemRepo.delete({});
+    const res = await this.orderRepo.delete({});
+    return { success: true, count: res.affected || 0 };
+  }
 }

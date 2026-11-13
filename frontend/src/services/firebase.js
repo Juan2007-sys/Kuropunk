@@ -425,14 +425,13 @@ export async function createFirestoreOrder(orderData) {
  * Subscribes in real-time to a specific customer's orders
  */
 export function subscribeUserOrders(userId, onData, onError) {
-  try {
-    const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-    if (local.length > 0) {
-      onData(local);
-    }
-  } catch {}
-
   if (!isFirebaseConfigured) {
+    try {
+      const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+      onData(local);
+    } catch {
+      onData([]);
+    }
     return () => {};
   }
 
@@ -461,14 +460,13 @@ export function subscribeUserOrders(userId, onData, onError) {
  * Subscribes in real-time to ALL orders (Admin only)
  */
 export function subscribeAllOrders(onData, onError) {
-  try {
-    const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-    if (local.length > 0) {
-      onData(local);
-    }
-  } catch {}
-
   if (!isFirebaseConfigured) {
+    try {
+      const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+      onData(local);
+    } catch {
+      onData([]);
+    }
     return () => {};
   }
 
@@ -481,20 +479,9 @@ export function subscribeAllOrders(onData, onError) {
         id: d.id,
         ...d.data()
       }));
-      try {
-        const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-        const remoteIds = new Set(orders.map((o) => o.id));
-        const merged = [...orders, ...local.filter((l) => !remoteIds.has(l.id))];
-        onData(merged);
-      } catch {
-        onData(orders);
-      }
+      onData(orders);
     },
     (err) => {
-      try {
-        const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-        if (local.length > 0) onData(local);
-      } catch {}
       if (onError) onError(err);
     }
   );
@@ -550,6 +537,53 @@ export async function verifyOrderDepositInFirestore(orderId, action) {
     return updateOrderStatusInFirestore(orderId, 'ESPERANDO_PAGO', {
       paymentStatus: 'RECHAZADO',
     });
+  }
+}
+
+/**
+ * Deletes an order permanently from Firestore and local caches
+ */
+export async function deleteOrderInFirestore(orderId) {
+  try {
+    const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+    const filtered = local.filter((o) => String(o.id) !== String(orderId));
+    localStorage.setItem('kuropunk_local_orders', JSON.stringify(filtered));
+  } catch {}
+
+  try {
+    const lastOrder = localStorage.getItem('kuropunk_last_order');
+    if (lastOrder) {
+      const parsed = JSON.parse(lastOrder);
+      if (String(parsed.id) === String(orderId)) {
+        localStorage.removeItem('kuropunk_last_order');
+      }
+    }
+  } catch {}
+
+  if (isFirebaseConfigured) {
+    const docRef = doc(db, 'orders', String(orderId));
+    await deleteDoc(docRef);
+  }
+}
+
+/**
+ * Clears all orders from local cache and Firestore
+ */
+export async function clearAllOrdersInFirestore(orderIds = []) {
+  try {
+    localStorage.removeItem('kuropunk_local_orders');
+    localStorage.removeItem('kuropunk_last_order');
+  } catch {}
+
+  if (isFirebaseConfigured && Array.isArray(orderIds)) {
+    for (const id of orderIds) {
+      try {
+        const docRef = doc(db, 'orders', String(id));
+        await deleteDoc(docRef);
+      } catch (e) {
+        console.warn('Error eliminando orden de Firestore:', id, e);
+      }
+    }
   }
 }
 

@@ -5,6 +5,7 @@ import {
   Body,
   Param,
   Patch,
+  Delete,
   Query,
   UsePipes,
   UseGuards,
@@ -68,5 +69,17 @@ export class OrdersController {
     @Body('status') status: string,
   ) {
     return this.ordersService.updateStatus(id, status);
+  }
+
+  @Delete(':id')
+  @UseGuards(AdminAuthGuard)
+  async remove(@Param('id') id: string) {
+    return this.ordersService.remove(id);
+  }
+
+  @Delete()
+  @UseGuards(AdminAuthGuard)
+  async clearAll() {
+    return this.ordersService.clearAll();
   }
 }
