@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_STEPS = [
-  { key: 'esperando_pago', label: '1. Anticipo 20%', icon: Clock, desc: 'Reserva para órdenes > $50k' },
+  { key: 'esperando_pago', label: '1. Anticipo 20%', icon: Clock, desc: 'Reserva para órdenes >= $50k' },
   { key: 'en_cola', label: '2. En Cola Oficial', icon: CheckCircle, desc: 'Anticipo validado / Turno asignado' },
   { key: 'in_production', label: '3. En Taller', icon: Hammer, desc: 'Tejiendo y ensamblando' },
   { key: 'shipped', label: '4. En Ruta', icon: Truck, desc: 'Entrega personal en camino' },
@@ -269,7 +269,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                         <span>Total del Pedido:</span>
                         <span className="text-white font-bold">{formatCOP(order.totalAmount || order.total)}</span>
                       </div>
-                      {(order.requiresDeposit || Number(order.totalAmount || order.total) > 50000) && (
+                      {(order.requiresDeposit || Number(order.totalAmount || order.total) >= 50000) && (
                         <div className="flex justify-between text-[#ffb4ab]">
                           <span>Anticipo (20%):</span>
                           <span>
@@ -290,7 +290,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                           {formatCOP(
                             order.remainingBalance !== undefined
                               ? order.remainingBalance
-                              : Number(order.totalAmount || order.total) > 50000
+                              : Number(order.totalAmount || order.total) >= 50000
                               ? Number(order.totalAmount || order.total) -
                                 Math.ceil(Number(order.totalAmount || order.total) * 0.20)
                               : order.totalAmount || order.total,

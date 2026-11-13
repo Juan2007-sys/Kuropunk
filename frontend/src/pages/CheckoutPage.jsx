@@ -69,8 +69,8 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
   const shippingCost = 0;
   const grandTotal = useMemo(() => subtotal, [subtotal]);
 
-  // Regla de los $50.000 COP: > $50.000 requiere anticipo obligatorio del 20%
-  const requiresDeposit = useMemo(() => grandTotal > DEPOSIT_THRESHOLD_COP, [grandTotal]);
+  // Regla de los $50.000 COP: >= $50.000 requiere anticipo obligatorio del 20%
+  const requiresDeposit = useMemo(() => grandTotal >= DEPOSIT_THRESHOLD_COP, [grandTotal]);
   const depositBaseAmount = useMemo(
     () => (requiresDeposit ? Math.ceil(grandTotal * 0.20) : 0),
     [requiresDeposit, grandTotal],
@@ -157,7 +157,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
       const generatedTracking = res.trackingCode || `KURO-TRK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
       const serverTotal = Number(res.total || grandTotal);
       const serverRequiresDeposit =
-        res.requiresDeposit !== undefined ? Boolean(res.requiresDeposit) : serverTotal > DEPOSIT_THRESHOLD_COP;
+        res.requiresDeposit !== undefined ? Boolean(res.requiresDeposit) : serverTotal >= DEPOSIT_THRESHOLD_COP;
       const serverBaseDeposit =
         res.depositBaseAmount !== undefined
           ? Number(res.depositBaseAmount)
@@ -364,7 +364,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                     Agenda tu Muñeco en la Cola de Producción
                   </h1>
                   <p className="font-mono text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                    Tu pedido supera los $50.000 COP. Para asegurar tus materiales y asignarte puesto oficial en la cola del taller, realiza la transferencia del <strong className="text-[#ffb4ab]">anticipo del 20%</strong> y registra el número de comprobante abajo.
+                    Tu pedido es de $50.000 COP o más. Para asegurar tus materiales y asignarte puesto oficial en la cola del taller, realiza la transferencia del <strong className="text-[#ffb4ab]">anticipo del 20%</strong> y registra el número de comprobante abajo.
                   </p>
                 </div>
 
@@ -964,10 +964,10 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                       <div className="p-3 bg-[#e0141f]/15 border-l-4 border-[#e0141f] font-mono text-xs text-[#ffb4ab] space-y-1">
                         <div className="font-bold text-white flex items-center gap-1.5 uppercase">
                           <AlertTriangle className="w-4 h-4 text-[#e0141f] shrink-0" />
-                          <span>Regla de Producción ({'>'} $50.000 COP)</span>
+                          <span>Regla de Producción (Desde $50.000 COP)</span>
                         </div>
                         <p className="text-[11px] leading-relaxed text-neutral-200">
-                          Para pedidos superiores a $50.000 COP se requiere un <strong>anticipo mínimo del 20%</strong> para agendar tu muñeco en la cola de producción.
+                          Para pedidos desde $50.000 COP se requiere un <strong>anticipo mínimo del 20%</strong> para agendar tu muñeco en la cola de producción.
                         </p>
                       </div>
                     )}

@@ -24,19 +24,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // 2. Colección de Pedidos (Sistema de Anticipo 20% > $50.000 COP + Contraentrega)
+    // 2. Colección de Pedidos (Sistema de Anticipo 20% >= $50.000 COP + Contraentrega)
     match /orders/{orderId} {
       // Creación de pedido:
-      // - Si supera $50.000 COP, debe iniciar obligatoriamente en 'ESPERANDO_PAGO'
-      // - Si es <= $50.000 COP, puede iniciar en 'EN_COLA' o 'placed'
+      // - Si es >= $50.000 COP, debe iniciar obligatoriamente en 'ESPERANDO_PAGO'
+      // - Si es < $50.000 COP, puede iniciar en 'EN_COLA' o 'placed'
       allow create: if request.resource.data.items.size() > 0 
                     && (request.resource.data.totalAmount > 0 || request.resource.data.total > 0)
                     && (
                       (
-                        (request.resource.data.totalAmount > 50000 || request.resource.data.total > 50000)
+                        (request.resource.data.totalAmount >= 50000 || request.resource.data.total >= 50000)
                         && request.resource.data.status == 'ESPERANDO_PAGO'
                       ) || (
-                        (request.resource.data.totalAmount <= 50000 || request.resource.data.total <= 50000)
+                        (request.resource.data.totalAmount < 50000 && request.resource.data.total < 50000)
                         && (request.resource.data.status == 'EN_COLA' || request.resource.data.status == 'placed')
                       )
                     );

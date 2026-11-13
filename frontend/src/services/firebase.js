@@ -339,7 +339,7 @@ export async function createFirestoreOrder(orderData) {
   const orderId = orderData.id || `KP-${Math.floor(100000 + Math.random() * 900000)}`;
   const totalVal = Number(orderData.total || 0);
   const requiresDeposit =
-    orderData.requiresDeposit !== undefined ? Boolean(orderData.requiresDeposit) : totalVal > 50000;
+    orderData.requiresDeposit !== undefined ? Boolean(orderData.requiresDeposit) : totalVal >= 50000;
   const depositBaseAmount =
     orderData.depositBaseAmount !== undefined
       ? Number(orderData.depositBaseAmount)

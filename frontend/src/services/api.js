@@ -152,14 +152,14 @@ export async function submitOrder(orderData) {
     if (err.status && err.status < 500) {
       throw err;
     }
-    // Si la API está inalcanzable, calcular de forma determinista la regla de los $50.000 COP
+    // Si la API está inalcanzable, calcular de forma determinista la regla de los $50.000 COP (>= 50k pide 20%)
     const officialSubtotal = (orderData.items || []).reduce((acc, it) => {
       const prod = ALL_LOCAL_PRODUCTS.find((p) => String(p.id) === String(it.productId));
       const unitPrice = prod ? Number(prod.price) : Number(it.price || 0);
       return acc + unitPrice * Number(it.quantity || 1);
     }, 0);
     const total = officialSubtotal;
-    const requiresDeposit = total > 50000;
+    const requiresDeposit = total >= 50000;
     const depositBaseAmount = requiresDeposit ? Math.ceil(total * 0.20) : 0;
     const randomPesos = requiresDeposit ? Math.floor(Math.random() * 99) + 1 : 0;
     const depositRequiredAmount = requiresDeposit ? depositBaseAmount + randomPesos : 0;

@@ -717,7 +717,7 @@ export function AdminPage({ onBackToShop }) {
                 CONTROL DE ANTICIPOS Y COLA DE PRODUCCIÓN
               </h2>
               <p className="font-mono text-xs text-neutral-400">
-                Los pedidos mayores a $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo del 20% con sus pesos únicos anti-fraude.
+                Los pedidos desde $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo del 20% con sus pesos únicos anti-fraude.
               </p>
             </div>
             <div className="px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-mono text-xs flex items-center space-x-2 shrink-0">
@@ -808,7 +808,7 @@ export function AdminPage({ onBackToShop }) {
                         POR CONFIRMAR ANTICIPO DEL 20% ({preQueueOrders.length})
                       </h3>
                       <p className="font-mono text-[11px] text-neutral-400">
-                        Estos pedidos superan los $50.000 COP y NO entran a la cola de tejido hasta que verifiques el ingreso exacto en Nequi / Bre-B / Bancolombia.
+                        Estos pedidos son de $50.000 COP o más y NO entran a la cola de tejido hasta que verifiques el ingreso exacto en Bre-B / Nequi.
                       </p>
                     </div>
                   </div>
@@ -998,7 +998,7 @@ export function AdminPage({ onBackToShop }) {
                           const remBalance =
                             Number(order.remainingBalance) > 0
                               ? Number(order.remainingBalance)
-                              : totalVal > 50000
+                              : totalVal >= 50000
                               ? totalVal - Math.ceil(totalVal * 0.20)
                               : totalVal;
 

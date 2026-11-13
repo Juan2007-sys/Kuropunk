@@ -27,7 +27,7 @@ const TIMELINE_STEPS = [
   {
     key: 'ESPERANDO_PAGO',
     title: '1. Anticipo del 20% (Reserva de Materiales)',
-    desc: 'Para pedidos > $50.000 COP se valida el anticipo del 20% antes de asignar puesto en la cola.',
+    desc: 'Para pedidos desde $50.000 COP se valida el anticipo del 20% antes de asignar puesto en la cola.',
     icon: Lock,
   },
   {
@@ -150,7 +150,7 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
 
   const currentStepIdx = order ? getStepIndex(order.status) : 0;
   const orderTotal = Number(order?.total || order?.totalAmount || 0);
-  const requiresDeposit = order?.requiresDeposit !== undefined ? Boolean(order.requiresDeposit) : orderTotal > 50000;
+  const requiresDeposit = order?.requiresDeposit !== undefined ? Boolean(order.requiresDeposit) : orderTotal >= 50000;
   const depositAmount = Number(order?.depositRequiredAmount || order?.depositBaseAmount || (requiresDeposit ? Math.ceil(orderTotal * 0.20) : 0));
   const remainingBalance = Number(
     order?.remainingBalance !== undefined

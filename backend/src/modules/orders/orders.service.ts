@@ -154,7 +154,7 @@ export class OrdersService {
         const trackingCode = `KURO-TRK-${randomUUID().replace(/-/g, '').substring(0, 7).toUpperCase()}`;
 
         // REGLA BLINDADA DE LOS $50.000 COP (Calculada estrictamente en el servidor)
-        const requiresDeposit = total > DEPOSIT_THRESHOLD_COP;
+        const requiresDeposit = total >= DEPOSIT_THRESHOLD_COP;
         let depositBaseAmount = 0;
         let depositRequiredAmount = 0;
         let remainingBalance = total;
