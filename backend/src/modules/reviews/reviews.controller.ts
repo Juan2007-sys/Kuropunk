@@ -20,7 +20,6 @@ export class ReviewsController {
   }
 
   @Post()
-  @UsePipes(new ValidationPipe({ whitelist: true }))
   async create(@Body() createReviewDto: CreateReviewDto) {
     return this.reviewsService.create(createReviewDto);
   }

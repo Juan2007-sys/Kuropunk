@@ -66,8 +66,7 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
     loginWithGoogle,
     loginWithEmail,
     registerWithEmail,
-    isFirebaseConfigured,
-    setDemoSession
+    isFirebaseConfigured
   } = useAuth();
 
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -326,7 +325,7 @@ export function AuthModal({ isOpen, onClose, defaultIntent = null, onSuccess }) 
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+57 301 569 0382"
+                    placeholder="+57 323 8937221"
                     className="w-full pl-10 pr-3 py-2.5 bg-neutral-900 border border-neutral-800 focus:border-[#e0141f] rounded text-white font-mono text-base sm:text-xs outline-none transition-colors min-h-[44px]"
                   />
                 </div>

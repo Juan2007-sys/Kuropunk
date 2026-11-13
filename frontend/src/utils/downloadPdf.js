@@ -1,15 +1,43 @@
 // PDF Generation and Download Utility for KuroPunk Patterns & Punto Cruz
 import { formatCOP } from './formatters';
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeImageUrl(url) {
+  const raw = String(url ?? '').trim();
+  if (
+    raw.startsWith('/') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('http://') ||
+    /^data:image\/(jpeg|jpg|png|webp);base64,/i.test(raw)
+  ) {
+    return escapeHtml(raw);
+  }
+  return '';
+}
+
 export function downloadPatternPDF(item) {
   const isPuntoCruz = item.type === 'punto_cruz';
-  const fileName = `KUROPUNK_${isPuntoCruz ? 'PUNTO_CRUZ' : 'PATRON'}_${item.id.toUpperCase()}.html`;
+  const safeFileId = String(item.id || 'ITEM').replace(/[^a-zA-Z0-9_-]/g, '_').toUpperCase();
+  const fileName = `KUROPUNK_${isPuntoCruz ? 'PUNTO_CRUZ' : 'PATRON'}_${safeFileId}.html`;
+  const safeTitle = escapeHtml(item.title || 'Modelo KuroPunk');
+  const safeTitleUpper = escapeHtml(String(item.title || 'Modelo KuroPunk').toUpperCase());
+  const safeSku = escapeHtml(item.sku || 'KP-DOC · 2026');
+  const safeDescription = escapeHtml(item.description || item.subtitle || '');
+  const safeImage = sanitizeImageUrl(item.image);
 
   const htmlContent = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>KUROPUNK // ${item.title} - ${isPuntoCruz ? 'Gráfico Punto Cruz' : 'Patrón de Crochet'}</title>
+  <title>KUROPUNK · ${safeTitle} - ${isPuntoCruz ? 'Gráfico Punto Cruz' : 'Patrón de Crochet'}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Hanken+Grotesk:wght@400;700&display=swap');
     
@@ -193,43 +221,43 @@ export function downloadPatternPDF(item) {
 
   <div class="header">
     <div>
-      <div class="brand-title">KUROPUNK // ARCHIVE</div>
+      <div class="brand-title">KUROPUNK · ARCHIVO</div>
       <div class="brand-sub">UNDERGROUND CROCHET & EMBROIDERY LAB</div>
     </div>
-    <div class="meta-badge">${isPuntoCruz ? 'DISEÑO PUNTO CRUZ' : 'GUÍA DIGITAL DE PATRÓN'} // OFICIAL</div>
+    <div class="meta-badge">${isPuntoCruz ? 'DISEÑO PUNTO CRUZ' : 'GUÍA DIGITAL DE PATRÓN'} · OFICIAL</div>
   </div>
 
   <div class="title-banner">
-    <div class="sku">${item.sku || 'KP-DOC // 2024'}</div>
-    <div class="title">${item.title.toUpperCase()}</div>
-    <p style="font-size: 13px; color: #e7bcb8; margin-top: 5px;">${item.description || item.subtitle || ''}</p>
+    <div class="sku">${safeSku}</div>
+    <div class="title">${safeTitleUpper}</div>
+    <p style="font-size: 13px; color: #e7bcb8; margin-top: 5px;">${safeDescription}</p>
   </div>
 
   <div class="grid-2">
     <div class="card">
       <h3>VISTA PREVIA DEL MODELO</h3>
-      <img src="${item.image}" alt="${item.title}" class="img-preview" />
+      <img src="${safeImage}" alt="${safeTitle}" class="img-preview" />
       <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8a8a86; text-align: center;">
-        FIG 1.1 // PROTOTIPO FINALIZADO
+        FIG 1.1 · PROTOTIPO FINALIZADO
       </div>
     </div>
 
     <div class="card">
       <h3>ESPECIFICACIONES TÉCNICAS</h3>
       <ul class="spec-list">
-        <li><strong>NIVEL:</strong> ${item.difficulty || 'INTERMEDIO'}</li>
+        <li><strong>NIVEL:</strong> ${escapeHtml(item.difficulty || 'INTERMEDIO')}</li>
         ${isPuntoCruz ? `
-          <li><strong>TELA BASE:</strong> ${item.fabric || 'Aida 14ct Negra / Denim'}</li>
-          <li><strong>TAMAÑO GRÁFICO:</strong> ${item.gridSize || '120 x 140 puntos'}</li>
-          <li><strong>PALETA DMC:</strong> ${item.dmcPalette || '8 Tonos DMC recomendados'}</li>
+          <li><strong>TELA BASE:</strong> ${escapeHtml(item.fabric || 'Aida 14ct Negra / Denim')}</li>
+          <li><strong>TAMAÑO GRÁFICO:</strong> ${escapeHtml(item.gridSize || '120 x 140 puntos')}</li>
+          <li><strong>PALETA DMC:</strong> ${escapeHtml(item.dmcPalette || '8 Tonos DMC recomendados')}</li>
           <li><strong>TIPO DE PUNTADA:</strong> Cruz completa (2 hebras) + Pespunte</li>
         ` : `
-          <li><strong>AGUJA / GAUGE:</strong> ${item.hookSize || '3.5mm Tactical Hook'}</li>
-          <li><strong>LANA / HILO:</strong> ${item.yarn || '100% Acrílico Industrial de Alta Tensión'}</li>
-          <li><strong>ALTURA FINAL:</strong> ${item.height || '8.0 - 9.0 Pulgadas'}</li>
-          <li><strong>PUNTOS CLAVE:</strong> ${item.stitches || 'AM, PB, AUM, DISM, PE, BLO'}</li>
+          <li><strong>AGUJA / GAUGE:</strong> ${escapeHtml(item.hookSize || '3.5mm Tactical Hook')}</li>
+          <li><strong>LANA / HILO:</strong> ${escapeHtml(item.yarn || '100% Acrílico Industrial de Alta Tensión')}</li>
+          <li><strong>ALTURA FINAL:</strong> ${escapeHtml(item.height || '8.0 - 9.0 Pulgadas')}</li>
+          <li><strong>PUNTOS CLAVE:</strong> ${escapeHtml(item.stitches || 'AM, PB, AUM, DISM, PE, BLO')}</li>
         `}
-        <li><strong>TIEMPO ESTIMADO:</strong> ${item.estimatedTime || '8-12 Horas'}</li>
+        <li><strong>TIEMPO ESTIMADO:</strong> ${escapeHtml(item.estimatedTime || '8-12 Horas')}</li>
       </ul>
     </div>
   </div>
@@ -250,8 +278,8 @@ export function downloadPatternPDF(item) {
   </div>
 
   <div class="footer">
-    <span>© 2024 KUROPUNK UNDERGROUND // TODOS LOS DERECHOS RESERVADOS</span>
-    <span>DOCUMENTO DE ACCESO LIBRE // ARCHIVO DIGITAL</span>
+    <span>© 2024 KUROPUNK UNDERGROUND · TODOS LOS DERECHOS RESERVADOS</span>
+    <span>DOCUMENTO DE ACCESO LIBRE · ARCHIVO DIGITAL</span>
   </div>
 
   <script>
@@ -277,28 +305,35 @@ export function downloadPatternPDF(item) {
 
 
 export function downloadReceiptPDF(order) {
-  const fileName = `KUROPUNK_RECIBO_${order.id || 'ORDER'}.html`;
+  const safeOrderId = escapeHtml(order.id || 'ORDER');
+  const safeFileId = String(order.id || 'ORDER').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `KUROPUNK_RECIBO_${safeFileId}.html`;
   const itemsHtml = (order.items || [])
     .map(
       (item) => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #333;">
-        <strong>${item.title || item.productId}</strong><br/>
-        <span style="font-size: 11px; color: #888;">Color: ${item.color || 'Asphalt'} // Talla: ${item.size || 'MED'}</span>
+        <strong>${escapeHtml(item.title || item.productId)}</strong><br/>
+        <span style="font-size: 11px; color: #888;">Color: ${escapeHtml(item.color || 'Asphalt')} · Talla: ${escapeHtml(item.size || 'MED')}</span>
       </td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${item.quantity}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${formatCOP(item.price)}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${formatCOP(Number(item.price) * Number(item.quantity))}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center;">${Number(item.quantity) || 1}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${escapeHtml(formatCOP(item.price))}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right;">${escapeHtml(formatCOP(Number(item.price) * Number(item.quantity)))}</td>
     </tr>
   `
     )
     .join('');
 
+  const totalNum = Number(order.total || order.totalAmount || 0);
+  const requiresDeposit = order.requiresDeposit ?? totalNum >= 50000;
+  const depositAmount = Number(order.depositRequiredAmount || order.depositBaseAmount || (requiresDeposit ? Math.ceil(totalNum * 0.2) : 0));
+  const remainingAmount = Number(order.remainingBalance ?? Math.max(0, totalNum - depositAmount));
+
   const htmlContent = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>KUROPUNK // VOUCHER OFICIAL - ${order.id}</title>
+  <title>KUROPUNK · VOUCHER OFICIAL - ${safeOrderId}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap');
     body {
@@ -332,27 +367,27 @@ export function downloadReceiptPDF(order) {
 <body>
   <div class="no-print" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
     <button class="btn" onclick="window.print()">🖨️ IMPRIMIR RECIBO / GUARDAR PDF</button>
-    <span style="font-size: 12px; color: #ffb4ab;">KUROPUNK ORDER DISPATCH // PAGO CONTRAENTREGA</span>
+    <span style="font-size: 12px; color: #ffb4ab;">KUROPUNK · PAGO CONTRAENTREGA</span>
   </div>
 
   <div class="header">
     <div>
-      <div class="brand">KUROPUNK // OFFICIAL RECEIPT</div>
-      <div style="font-size: 10px; color: #e0141f; letter-spacing: 2px;">TALLER ARTESANAL DE CROCHET // COLOMBIA</div>
+      <div class="brand">KUROPUNK · RECIBO OFICIAL</div>
+      <div style="font-size: 10px; color: #e0141f; letter-spacing: 2px;">TALLER ARTESANAL DE CROCHET · COLOMBIA</div>
     </div>
     <div style="text-align: right; font-size: 11px;">
-      <div>ORDEN: <strong style="color: #ffb4ab;">#${order.id}</strong></div>
-      <div>FECHA: ${new Date().toLocaleDateString('es-CO')}</div>
-      <div>TRACKING: <strong style="color: #4ade80;">${order.trackingCode || order.id}</strong></div>
+      <div>ORDEN: <strong style="color: #ffb4ab;">#${safeOrderId}</strong></div>
+      <div>FECHA: ${escapeHtml(new Date().toLocaleDateString('es-CO'))}</div>
+      <div>TRACKING: <strong style="color: #4ade80;">${escapeHtml(order.trackingCode || order.id)}</strong></div>
     </div>
   </div>
 
   <div class="box">
-    <div style="font-size: 11px; color: #888; margin-bottom: 8px;">DESTINATARIO // ENTREGA PERSONALIZADA:</div>
-    <div style="font-size: 14px; font-weight: bold; color: #fff;">${order.customerName || 'Cliente KuroPunk'}</div>
-    <div style="font-size: 12px; color: #ccc;">📱 Celular: ${order.phone || 'N/A'}</div>
-    <div style="font-size: 12px; color: #aaa; margin-top: 4px;">📍 Dirección: ${order.address || ''}, Barrio: ${order.neighborhood || ''}, ${order.city || ''} (${order.department || 'Colombia'})</div>
-    <div style="font-size: 11px; color: #e0141f; margin-top: 6px;">🚚 Entrega en mano directa por el artesano (+57 301 569 0382)</div>
+    <div style="font-size: 11px; color: #888; margin-bottom: 8px;">DESTINATARIO · ENTREGA PERSONALIZADA:</div>
+    <div style="font-size: 14px; font-weight: bold; color: #fff;">${escapeHtml(order.customerName || 'Cliente KuroPunk')}</div>
+    <div style="font-size: 12px; color: #ccc;">📱 Celular: ${escapeHtml(order.phone || 'N/A')}</div>
+    <div style="font-size: 12px; color: #aaa; margin-top: 4px;">📍 Dirección: ${escapeHtml(order.address || '')}, Barrio: ${escapeHtml(order.neighborhood || '')}, ${escapeHtml(order.city || '')} (${escapeHtml(order.department || 'Colombia')})</div>
+    <div style="font-size: 11px; color: #e0141f; margin-top: 6px;">🚚 Entrega en mano directa por el artesano (+57 323 8937221)</div>
   </div>
 
   <div class="box">
@@ -374,14 +409,19 @@ export function downloadReceiptPDF(order) {
     </table>
 
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #5e3f3c; text-align: right; font-size: 13px; line-height: 1.8;">
-      <div>SUBTOTAL: ${formatCOP(order.subtotal || order.total)}</div>
-      <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">TOTAL A PAGAR AL RECIBIR: ${formatCOP(order.total)}</div>
-      <div style="font-size: 11px; color: #888; margin-top: 4px;">MODALIDAD: Pago Contraentrega (Efectivo o Transferencia Nequi / Daviplata al verificar la pieza)</div>
+      <div>SUBTOTAL: ${escapeHtml(formatCOP(order.subtotal || totalNum))}</div>
+      ${requiresDeposit ? `
+        <div style="color: #facc15;">ANTICIPO 20% (${escapeHtml(order.paymentReference || 'BRE-B')}): ${escapeHtml(formatCOP(depositAmount))}</div>
+        <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">SALDO RESTANTE CONTRAENTREGA (80%): ${escapeHtml(formatCOP(remainingAmount))}</div>
+      ` : `
+        <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">TOTAL A PAGAR AL RECIBIR: ${escapeHtml(formatCOP(totalNum))}</div>
+      `}
+      <div style="font-size: 11px; color: #888; margin-top: 4px;">MODALIDAD: Pago Contraentrega (Efectivo o Transferencia Bre-B / Nequi / Daviplata al verificar la pieza)</div>
     </div>
   </div>
 
   <div style="text-align: center; font-size: 10px; color: #666; margin-top: 30px;">
-    PIEZA ARTESANAL ÚNICA HECHA A MANO // CONTACTO WHATSAPP: +57 301 569 0382 // KUROPUNK COLOMBIA
+    PIEZA ARTESANAL ÚNICA HECHA A MANO · CONTACTO WHATSAPP: +57 323 8937221 · KUROPUNK COLOMBIA
   </div>
 </body>
 </html>`;

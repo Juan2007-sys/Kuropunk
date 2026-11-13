@@ -163,10 +163,9 @@ export class WhatsAppService {
 
     switch (status) {
       case 'placed':
-      case 'confirmed':
         return `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
-          `> 📦 *NUEVA ORDEN CONTRAENTREGA*\n\n` +
-          `¡Hola *${customerName}*! Tu pedido ha sido registrado con éxito en nuestro taller.\n\n` +
+          `> 📦 *NUEVA ORDEN RECIBIDA*\n\n` +
+          `¡Hola *${customerName}*! Tu pedido ha sido registrado en nuestro taller.\n\n` +
           `📋 *DETALLES DEL PEDIDO*\n` +
           `▪️ *Orden:* \`#${order.id}\`\n` +
           `▪️ *Seguimiento:* \`${trackingId}\`\n` +
@@ -174,10 +173,25 @@ export class WhatsAppService {
           `🛍️ *PIEZAS SOLICITADAS*\n` +
           `${itemsSummary}\n\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `💰 *TOTAL A PAGAR EN LA ENTREGA:* *${formattedTotal}*\n` +
-          `🚚 *MÉTODO:* Pago Contraentrega en Mano (Pagas al recibir)\n` +
+          `💰 *TOTAL DEL PEDIDO:* *${formattedTotal}*\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-          `Iniciamos la preparación de tus piezas. Te notificaremos cuando el mensajero salga hacia tu dirección. ¡Muchas gracias por apoyar el arte textil artesanal! 🧶🖤`;
+          `¡Muchas gracias por apoyar el arte textil artesanal! 🧶🖤`;
+
+      case 'confirmed': {
+        const depositPaid = Number(order.depositRequiredAmount || order.depositBaseAmount || 0);
+        const remaining = Number(order.remainingBalance ?? Math.max(0, cleanTotal - depositPaid));
+        const formattedDeposit = `$ ${depositPaid.toLocaleString('es-CO')} COP`;
+        const formattedRemaining = `$ ${remaining.toLocaleString('es-CO')} COP`;
+        return `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
+          `> ✅ *ANTICIPO ACEPTADO · PEDIDO EN COLA OFICIAL*\n\n` +
+          `¡Hola *${customerName}*! Confirmamos la recepción de tu anticipo del 20% (*${formattedDeposit}*) para la orden \`#${order.id}\`.\n\n` +
+          `📋 *ESTADO DE TU ORDEN*\n` +
+          `▪️ *Estado:* En Cola Oficial de Producción\n` +
+          `▪️ *Seguimiento:* \`${trackingId}\`\n` +
+          `▪️ *Anticipo Aprobado:* ${formattedDeposit}\n` +
+          `▪️ *Saldo Restante Contraentrega (80%):* *${formattedRemaining}*\n\n` +
+          `Iniciamos la confección de tu pieza y te avisaremos en cuanto salga a despacho. ¡Gracias por tu compra! 🧶🖤`;
+      }
 
       case 'in_production':
         return `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
@@ -187,7 +201,8 @@ export class WhatsAppService {
           `▪️ *Seguimiento:* \`${trackingId}\`\n\n` +
           `Cada puntada está siendo trabajada a mano con hilado de alta torsión. Te avisaremos en cuanto esté listo para despacho. 🧶`;
 
-      case 'shipped':
+      case 'shipped': {
+        const storefrontUrl = (process.env.FRONTEND_URL || 'https://kuropunk.vercel.app').replace(/\/+$/, '');
         return `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
           `> 🛵 *TU PEDIDO VA EN CAMINO*\n\n` +
           `¡Hola *${customerName}*! Tu paquete ya salió de nuestro taller y se encuentra en ruta de entrega.\n\n` +
@@ -197,9 +212,10 @@ export class WhatsAppService {
           `▪️ *Total a Pagar:* *${formattedTotal}* (Efectivo / Nequi / Daviplata)\n\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n` +
           `🔎 *Código de Rastreo:* \`${trackingId}\`\n` +
-          `🚚 *Rastreo en línea:* https://kuropunk.com/rastreo/${trackingId}\n` +
+          `🚚 *Rastreo en línea:* ${storefrontUrl}/#/ (Ingresa tu código ${trackingId})\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
           `El mensajero te contactará a este número antes de llegar a tu dirección. Ten a mano el valor exacto o tu app de Nequi/Daviplata. 🧶🖤`;
+      }
 
       case 'delivered':
         return `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
@@ -210,7 +226,7 @@ export class WhatsAppService {
           `Nos honra que formes parte de nuestra comunidad de coleccionistas de arte textil underground. Esperamos que disfrutes tu pieza tanto como nosotros disfrutamos tejiéndola.\n\n` +
           `━━━━━━━━━━━━━━━━━━━━━━\n` +
           `Si deseas compartirnos una foto de tu pieza o dejarnos una reseña, puedes hacerlo directamente por aquí. ¡Muchas gracias por tu compra! 🖤🧶\n\n` +
-          `🌐 *KuroPunk Colombia* | +57 301 569 0382`;
+          `🌐 *KuroPunk Colombia* | +57 323 8937221`;
 
       case 'cancelled':
         return `⚠️ *KUROPUNK* | *Notificación de Pedido*\n` +
@@ -221,7 +237,7 @@ export class WhatsAppService {
           `Te confirmamos que la orden *#${order.id}* ha sido dada de baja en nuestro sistema.\n\n` +
           `Si se trató de un error o deseas reactivar tu encargo o modificar la fecha de entrega, escríbenos a este mismo número y te atenderemos con gusto.\n\n` +
           `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `📞 *Atención al Cliente:* +57 301 569 0382`;
+          `📞 *Atención al Cliente:* +57 323 8937221`;
 
       default:
         return `🔔 *KUROPUNK* | *Novedad en tu Pedido*\n` +
@@ -230,13 +246,13 @@ export class WhatsAppService {
           `Estado actual: *${String(status).toUpperCase()}*\n` +
           `Seguimiento: \`${trackingId}\`\n\n` +
           `Para cualquier duda, estamos atentos por este medio.\n` +
-          `📞 +57 301 569 0382`;
+          `📞 +57 323 8937221`;
     }
   }
 
   /**
    * Sanitizes phone numbers to standard E.164 international format
-   * Example: "3015690382" -> "+573015690382"
+   * Example: "3238937221" -> "+573238937221"
    */
   private normalizePhoneE164(phone: string): string {
     const digits = phone.replace(/\D/g, '');

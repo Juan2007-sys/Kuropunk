@@ -38,7 +38,6 @@ export class ProductsController {
 
   @Post()
   @UseGuards(AdminAuthGuard)
-  @UsePipes(new ValidationPipe({ whitelist: true }))
   async create(@Body() createProductDto: CreateProductDto) {
     return this.productsService.create(createProductDto);
   }

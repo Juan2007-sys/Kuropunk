@@ -47,7 +47,7 @@ export const OurStoryPage = ({ setCurrentView }) => {
           className="mb-14 relative inline-block self-start"
         >
           <div className="tape-overlay !top-[-16px] !-left-4 !rotate-[-4deg]">
-            FUNDADO EN 2024 // BOGOTÁ, COLOMBIA
+            FUNDADO EN 2024 · BOGOTÁ, COLOMBIA
           </div>
           <h1 className="font-stencil text-6xl sm:text-7xl lg:text-[88px] leading-[0.9] text-[#e6e1e1] uppercase relative z-10 pt-4">
             El Origen<br />
@@ -79,9 +79,9 @@ export const OurStoryPage = ({ setCurrentView }) => {
                   Nuestros Principios Fundamentales
                 </div>
                 <ul className="text-xs text-[#c7c6c2] space-y-1.5 font-mono">
-                  <li>01 // CERO FÁBRICAS INDUSTRIALES. 100% HECHO A MANO.</li>
-                  <li>02 // HILADOS ACRÍLICOS Y FIBRAS DE ALTA DENSIDAD.</li>
-                  <li>03 // LANZAMIENTOS NUMERADOS CON CERTIFICADO EN BÓVEDA.</li>
+                  <li>01 · CERO FÁBRICAS INDUSTRIALES. 100% HECHO A MANO.</li>
+                  <li>02 · HILADOS ACRÍLICOS Y FIBRAS DE ALTA DENSIDAD.</li>
+                  <li>03 · LANZAMIENTOS NUMERADOS CON CERTIFICADO EN BÓVEDA.</li>
                 </ul>
               </div>
 
@@ -157,13 +157,13 @@ export const OurStoryPage = ({ setCurrentView }) => {
               Desafía lo Convencional
             </span>
             <span className="hidden md:inline font-stencil text-2xl sm:text-3xl text-[#c7c6c2] uppercase opacity-40">
-              ///
+              ·
             </span>
             <span className="font-stencil text-2xl sm:text-3xl text-[#ffb4ab] uppercase tracking-wider">
               Abraza la Resistencia
             </span>
             <span className="hidden md:inline font-stencil text-2xl sm:text-3xl text-[#c7c6c2] uppercase opacity-40">
-              ///
+              ·
             </span>
             <span className="font-stencil text-2xl sm:text-3xl text-[#e0141f] uppercase tracking-wider">
               Crochet Underground

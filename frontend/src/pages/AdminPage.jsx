@@ -14,8 +14,20 @@ import {
   syncCatalogToFirestore,
   isFirebaseConfigured
 } from '../services/firebase';
-import { formatCOP, generateAdminToCustomerWhatsAppUrl } from '../utils/formatters';
-import { getContactMessages, getAllOrders, verifyOrderDeposit, deleteOrderApi, clearAllOrdersApi } from '../services/api';
+import {
+  formatCOP,
+  generateAdminToCustomerWhatsAppUrl,
+  generateAdminDepositNoticeWhatsAppUrl,
+} from '../utils/formatters';
+import {
+  getContactMessages,
+  getAllOrders,
+  verifyOrderDeposit,
+  updateOrderStatusApi,
+  deleteOrderApi,
+  clearAllOrdersApi,
+  syncProductToBackendApi,
+} from '../services/api';
 import { PRODUCTS as fallbackCatalog, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 import {
   Package,
@@ -260,7 +272,7 @@ export function AdminPage({ onBackToShop }) {
     if (newStatus === 'cancelled' || newStatus === 'CANCELLED') {
       setConfirmConfig({
         isOpen: true,
-        title: 'CANCELAR ORDEN // TALLER',
+        title: 'CANCELAR ORDEN · TALLER',
         message: `¿Estás seguro de cancelar la orden #${orderId}? Las piezas reservadas serán restituidas al inventario disponible de inmediato.`,
         confirmText: 'SÍ, CANCELAR Y RESTITUIR STOCK',
         cancelText: 'VOLVER',
@@ -281,23 +293,11 @@ export function AdminPage({ onBackToShop }) {
     try {
       await updateOrderStatusInFirestore(orderId, newStatus);
 
-      // Sincronizar en API local si se cancela para restaurar stock en SQLite
-      if (newStatus === 'cancelled') {
-        try {
-          const rawApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/+$/, '');
-          const apiBase = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
-          const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
-          await fetch(`${apiBase}/orders/${orderId}/status`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-admin-key': adminKey
-            },
-            body: JSON.stringify({ status: 'CANCELLED' })
-          });
-        } catch (e) {
-          console.warn('[AdminPage] Sincronización API local:', e);
-        }
+      // Sincronizar cambio de estado con el backend NestJS (incluyendo restitución de stock al cancelar)
+      try {
+        await updateOrderStatusApi(orderId, newStatus);
+      } catch (e) {
+        console.warn('[AdminPage] Sincronización de estado en backend:', e);
       }
 
       setOrders((prev) =>
@@ -314,9 +314,13 @@ export function AdminPage({ onBackToShop }) {
     }
   };
 
+  const [lastVerifiedNotice, setLastVerifiedNotice] = useState(null);
+  const [previewProofUrl, setPreviewProofUrl] = useState(null);
+
   // Handle Admin Deposit Verification (Confirm -> EN_COLA + queuedAt, Reject -> ESPERANDO_PAGO + RECHAZADO)
   const handleVerifyDeposit = async (orderId, action) => {
     const act = String(action || '').toUpperCase();
+    const targetOrder = orders.find((o) => String(o.id) === String(orderId));
     setUpdatingOrderId(orderId);
     try {
       const updatedFromBackend = await verifyOrderDeposit(orderId, { action: act });
@@ -325,6 +329,15 @@ export function AdminPage({ onBackToShop }) {
       const nowIso = updatedFromBackend?.queuedAt || new Date().toISOString();
       const nextStatus = act === 'CONFIRM' ? 'EN_COLA' : 'ESPERANDO_PAGO';
       const nextPaymentStatus = act === 'CONFIRM' ? 'ANTICIPO_VERIFICADO' : 'RECHAZADO';
+
+      const mergedOrder = targetOrder
+        ? {
+            ...targetOrder,
+            status: nextStatus,
+            paymentStatus: nextPaymentStatus,
+            queuedAt: act === 'CONFIRM' ? nowIso : null,
+          }
+        : null;
 
       setOrders((prev) =>
         prev.map((o) =>
@@ -352,11 +365,43 @@ export function AdminPage({ onBackToShop }) {
         );
       }
 
+      if (mergedOrder) {
+        setLastVerifiedNotice({
+          order: mergedOrder,
+          action: act,
+          whatsappUrl: generateAdminDepositNoticeWhatsAppUrl(mergedOrder, act),
+        });
+      }
+
       if (act === 'CONFIRM') {
         playRadarChime();
-        toast.success(`¡Anticipo del 20% confirmado! Orden #${orderId} enviada a la Cola de Producción Oficial.`);
+        const waUrl = mergedOrder ? generateAdminDepositNoticeWhatsAppUrl(mergedOrder, 'CONFIRM') : '';
+        toast.success(
+          `¡Anticipo aceptado! Orden #${orderId} enviada a la Cola Oficial y notificada en la página del cliente.`,
+          waUrl
+            ? {
+                action: {
+                  label: 'Avisar por WhatsApp',
+                  onClick: () => window.open(waUrl, '_blank', 'noopener,noreferrer'),
+                },
+                duration: 8000,
+              }
+            : undefined,
+        );
       } else {
-        toast.warning(`Anticipo rechazado para la orden #${orderId}. Se notificó que el pago no fue recibido.`);
+        const waRejectUrl = mergedOrder ? generateAdminDepositNoticeWhatsAppUrl(mergedOrder, 'REJECT') : '';
+        toast.warning(
+          `Anticipo rechazado para la orden #${orderId}. Se notificó en la página que el pago no fue validado.`,
+          waRejectUrl
+            ? {
+                action: {
+                  label: 'Avisar por WhatsApp',
+                  onClick: () => window.open(waRejectUrl, '_blank', 'noopener,noreferrer'),
+                },
+                duration: 8000,
+              }
+            : undefined,
+        );
       }
     } catch (err) {
       toast.error('Error al verificar anticipo: ' + (err.message || 'Intenta de nuevo'));
@@ -376,8 +421,8 @@ export function AdminPage({ onBackToShop }) {
       onConfirm: async () => {
         closeConfirm();
         try {
-          await deleteOrderInFirestore(orderId);
           await deleteOrderApi(orderId);
+          await deleteOrderInFirestore(orderId);
           setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
           if (selectedOrderDetail && String(selectedOrderDetail.id) === String(orderId)) {
             setSelectedOrderDetail(null);
@@ -550,9 +595,10 @@ export function AdminPage({ onBackToShop }) {
         destacado: true
       };
 
-      // 4. Guardado en Firestore con try/catch y logs explícitos
+      // 4. Guardado en Firestore + sincronización de stock/precio en Backend SQLite
       await saveProductInFirestore(payload);
-      toast.success(`¡Pieza "${payload.title}" guardada exitosamente en Firestore!`);
+      await syncProductToBackendApi(payload);
+      toast.success(`¡Pieza "${payload.title}" guardada exitosamente!`);
 
       // Actualizar estado en UI reactiva
       setProductsList((prev) => {
@@ -642,14 +688,14 @@ export function AdminPage({ onBackToShop }) {
         <div>
           <div className="flex items-center space-x-2 text-xs font-mono text-[#ffb4ab] tracking-widest uppercase mb-1">
             <span className="w-2 h-2 bg-[#e0141f] rounded-full animate-ping" />
-            <span>KUROPUNK // ADMIN COMMAND CONSOLE [RBAC ACTIVE]</span>
+            <span>KUROPUNK · PANEL DE ADMINISTRACIÓN [RBAC ACTIVO]</span>
           </div>
           <h1 className="font-headline-lg text-3xl sm:text-5xl text-white uppercase tracking-wider">
             PANEL DE ADMINISTRACIÓN Y TALLER
           </h1>
           <p className="font-mono text-xs text-neutral-400 mt-1">
             Sesión: <span className="text-white font-bold">{currentUser?.displayName}</span> (
-            <span className="text-emerald-400">{currentUser?.email}</span>) // Custom Claim: Role = ADMIN
+            <span className="text-emerald-400">{currentUser?.email}</span>) · Rol: ADMIN
           </p>
         </div>
 
@@ -717,7 +763,7 @@ export function AdminPage({ onBackToShop }) {
                 CONTROL DE ANTICIPOS Y COLA DE PRODUCCIÓN
               </h2>
               <p className="font-mono text-xs text-neutral-400">
-                Los pedidos desde $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo del 20% con sus pesos únicos anti-fraude.
+                Los pedidos desde $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo exacto del 20% con su comprobante.
               </p>
             </div>
             <div className="px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-mono text-xs flex items-center space-x-2 shrink-0">
@@ -796,13 +842,56 @@ export function AdminPage({ onBackToShop }) {
             </div>
           ) : (
             <div className="space-y-8">
+              {/* Banner rápido para notificar al cliente por WhatsApp tras aprobar o rechazar su anticipo */}
+              {lastVerifiedNotice && (
+                <div
+                  className={`p-4 border-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs ${
+                    lastVerifiedNotice.action === 'CONFIRM'
+                      ? 'bg-emerald-950/40 border-[#25D366] text-emerald-200'
+                      : 'bg-red-950/40 border-red-500 text-red-200'
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <strong className="text-white text-sm uppercase block">
+                      {lastVerifiedNotice.action === 'CONFIRM'
+                        ? `✓ Anticipo Aceptado para Orden #${lastVerifiedNotice.order.id}`
+                        : `⚠ Anticipo Rechazado para Orden #${lastVerifiedNotice.order.id}`}
+                    </strong>
+                    <span>
+                      El estado ya se actualizó en vivo en la página del cliente. También puedes enviarle el aviso directo a su WhatsApp:
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {lastVerifiedNotice.whatsappUrl && (
+                      <a
+                        href={lastVerifiedNotice.whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2.5 bg-[#25D366] hover:bg-[#1fa851] text-black font-bold uppercase text-xs flex items-center gap-1.5 shadow-lg"
+                      >
+                        <MessageSquare className="w-4 h-4 fill-black" />
+                        <span>Enviar Aviso por WhatsApp al Cliente</span>
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setLastVerifiedNotice(null)}
+                      className="p-2 text-neutral-400 hover:text-white border border-neutral-700"
+                      title="Cerrar aviso"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* SECCIÓN 1: POR CONFIRMAR ANTICIPO (ESPERANDO_PAGO y VERIFICANDO_ANTICIPO) */}
               {(orderQueueFilter === 'pre_queue' || orderQueueFilter === 'split') && (
                 <div className="bg-[#141313] border-2 border-amber-500/60 p-4 sm:p-6 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/30 pb-3">
                     <div>
                       <span className="font-mono text-[10px] uppercase tracking-widest text-amber-400 block font-bold">
-                        SECCIÓN 1 // PRE-COLA DE VALIDACIÓN FINANCIERA
+                        SECCIÓN 1 · PRE-COLA DE VALIDACIÓN FINANCIERA
                       </span>
                       <h3 className="font-headline-md text-xl sm:text-2xl text-white uppercase">
                         POR CONFIRMAR ANTICIPO DEL 20% ({preQueueOrders.length})
@@ -861,14 +950,14 @@ export function AdminPage({ onBackToShop }) {
                                 </span>
                               </div>
 
-                              {/* Monto Exacto Esperado y Referencia del Cliente */}
+                              {/* Monto del Anticipo (20%) y Referencia del Cliente */}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-black/70 border border-amber-500/40">
                                 <div>
                                   <span className="text-[10px] text-amber-300 uppercase block font-bold">
-                                    Monto Exacto Esperado (20% + ID)
+                                    Valor del Anticipo (20%)
                                   </span>
                                   <strong className="font-headline-md text-2xl sm:text-3xl text-amber-400 tracking-wider block">
-                                    {formatCOP(exactExpected)}
+                                    {formatCOP(baseDep)}
                                   </strong>
                                   <span className="text-[10px] text-neutral-400">
                                     Total orden: {formatCOP(totalVal)} • Saldo 80%: {formatCOP(remBal)}
@@ -889,15 +978,22 @@ export function AdminPage({ onBackToShop }) {
                                     </span>
                                   )}
                                   {order.paymentProofUrl && (
-                                    <a
-                                      href={order.paymentProofUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 text-[10px] text-[#ffb4ab] underline mt-1"
-                                    >
-                                      <ExternalLink className="w-3 h-3" />
-                                      <span>Ver captura de pago</span>
-                                    </a>
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      <img
+                                        src={order.paymentProofUrl}
+                                        alt="Comprobante"
+                                        onClick={() => setPreviewProofUrl(order.paymentProofUrl)}
+                                        className="w-10 h-10 object-cover border border-amber-400/60 cursor-pointer hover:opacity-80"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewProofUrl(order.paymentProofUrl)}
+                                        className="inline-flex items-center gap-1 text-[10px] text-[#ffb4ab] hover:text-white underline cursor-pointer"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                        <span>Ver foto del comprobante</span>
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -967,7 +1063,7 @@ export function AdminPage({ onBackToShop }) {
                   <div className="p-4 bg-[#141313] border-l-4 border-emerald-500 border-t border-r border-b border-[#5e3f3c] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-400 block font-bold">
-                        SECCIÓN 2 // TRABAJO REAL EN TALLER (ORDENADO POR LLEGADA / PAGO CONFIRMADO)
+                        SECCIÓN 2 · TRABAJO REAL EN TALLER (ORDENADO POR LLEGADA / PAGO CONFIRMADO)
                       </span>
                       <h3 className="font-headline-md text-xl sm:text-2xl text-white uppercase">
                         COLA DE PRODUCCIÓN OFICIAL ({officialQueueOrders.length})
@@ -1107,11 +1203,15 @@ export function AdminPage({ onBackToShop }) {
                                 <div className="flex items-center justify-end gap-2">
                                   {cleanPhone && (
                                     <a
-                                      href={`https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20tu%20orden%20%23${order.id}`}
+                                      href={
+                                        order.paymentStatus === 'ANTICIPO_VERIFICADO'
+                                          ? generateAdminDepositNoticeWhatsAppUrl(order, 'CONFIRM')
+                                          : `https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20tu%20orden%20%23${order.id}`
+                                      }
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="px-2 py-1 bg-emerald-950/80 border border-emerald-500/50 hover:bg-emerald-900 text-emerald-300 text-[10px] uppercase font-bold flex items-center gap-1"
-                                      title="Abrir chat en WhatsApp"
+                                      title="Enviar confirmación de pago aceptado o contactar por WhatsApp"
                                     >
                                       <MessageSquare className="w-3 h-3 fill-emerald-300" />
                                       <span className="hidden sm:inline">WhatsApp</span>
@@ -1125,6 +1225,7 @@ export function AdminPage({ onBackToShop }) {
                                     Ficha
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => handleDeleteOrder(order.id)}
                                     className="px-2 py-1 bg-red-950/80 border border-red-700/60 hover:bg-red-900 text-red-300 text-[10px] uppercase font-bold flex items-center gap-1 cursor-pointer transition-colors"
                                     title="Eliminar orden permanentemente"
@@ -1142,6 +1243,33 @@ export function AdminPage({ onBackToShop }) {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* MODAL DE PREVISUALIZACIÓN DE CAPTURA DE PAGO */}
+          {previewProofUrl && (
+            <div
+              onClick={() => setPreviewProofUrl(null)}
+              className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#141313] border-2 border-[#25D366] max-w-lg w-full p-4 space-y-3 font-mono text-xs"
+              >
+                <div className="flex items-center justify-between border-b border-[#5e3f3c] pb-2">
+                  <strong className="text-[#25D366] uppercase">Captura del Comprobante del Cliente</strong>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewProofUrl(null)}
+                    className="p-1 text-neutral-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="max-h-[75vh] overflow-auto flex justify-center bg-black p-2">
+                  <img src={previewProofUrl} alt="Comprobante de pago" className="max-w-full h-auto object-contain" />
+                </div>
+              </div>
             </div>
           )}
 
@@ -1378,7 +1506,7 @@ export function AdminPage({ onBackToShop }) {
                         </span>
                       )}
                       <a
-                        href={`mailto:${msg.email}?subject=KuroPunk%20//%20Cotización%20de%20tu%20encargo&body=Hola%20${encodeURIComponent(msg.name)},%20te%20escribimos%20del%20taller%20KuroPunk...`}
+                        href={`mailto:${msg.email}?subject=KuroPunk%20-%20Cotización%20de%20tu%20encargo&body=Hola%20${encodeURIComponent(msg.name)},%20te%20escribimos%20del%20taller%20KuroPunk...`}
                         className="py-2.5 px-3 bg-[#1d1b1b] hover:bg-[#252222] border border-[#5e3f3c] text-white text-center uppercase tracking-wider font-bold transition-colors"
                       >
                         Email
@@ -1421,7 +1549,7 @@ export function AdminPage({ onBackToShop }) {
                   required
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
-                  placeholder="Ej: The Mechanic // Rogue Series"
+                  placeholder="Ej: The Mechanic · Rogue Series"
                   className="w-full min-h-[44px] p-2.5 bg-[#1d1b1b] border border-[#5e3f3c] focus:border-[#e0141f] text-white text-base sm:text-xs outline-none"
                 />
               </div>
@@ -1682,7 +1810,7 @@ export function AdminPage({ onBackToShop }) {
                   />
                   <div className="flex-1 min-w-0 font-mono">
                     <span className="text-[10px] text-[#ffb4ab] uppercase block">
-                      {prod.technique || prod.type || 'amigurumi'} // Stock: {prod.stock ?? 5}
+                      {prod.technique || prod.type || 'amigurumi'} · Stock: {prod.stock ?? 5}
                     </span>
                     <h4 className="text-white font-bold text-sm truncate">{prod.title}</h4>
                     <p className="text-emerald-400 font-bold text-xs mt-1">

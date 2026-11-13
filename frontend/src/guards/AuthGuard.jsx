@@ -33,7 +33,7 @@ export function AuthGuard({ children, fallbackMessage, intent = 'checkout', allo
               AUTENTICACIÓN REQUERIDA
             </h2>
             <p className="font-mono text-xs text-[#ffb4ab]">
-              PROTOCOLO DE SEGURIDAD // KUROPUNK ACCESS CONTROL
+              PROTOCOLO DE SEGURIDAD · KUROPUNK ACCESS CONTROL
             </p>
           </div>
         </div>

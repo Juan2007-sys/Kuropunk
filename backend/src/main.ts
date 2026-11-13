@@ -8,8 +8,8 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 // Almacén en memoria para Rate Limiting por IP (Zero-Trust Anti-DoS / Anti-Bots)
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 const RATE_WINDOW_MS = 60_000; // 1 minuto
-const MAX_REQUESTS_PER_WINDOW = 35; // Límite estricto por minuto por IP
-const MAX_PAYLOAD_BYTES = 50 * 1024; // 50KB máximo por petición
+const MAX_REQUESTS_PER_WINDOW = 45; // Límite por minuto por IP
+const MAX_PAYLOAD_BYTES = 120 * 1024; // 120KB máximo por petición (soporta capturas comprimidas de comprobante)
 
 async function bootstrap() {
   const logger = new Logger('KuroPunkBackend');
@@ -18,6 +18,9 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   if (expressApp && typeof expressApp.disable === 'function') {
     expressApp.disable('x-powered-by');
+  }
+  if (expressApp && typeof expressApp.set === 'function') {
+    expressApp.set('trust proxy', 1);
   }
 
   // 1. CORS Estricto (Registrado antes del Rate Limiter para que las respuestas 413/429 incluyan cabeceras CORS)
@@ -57,7 +60,7 @@ async function bootstrap() {
         timestamp: new Date().toISOString(),
         path: req.url,
         error: {
-          message: 'El tamaño del payload excede el límite de seguridad permitido (50KB).',
+          message: 'El tamaño del payload excede el límite de seguridad permitido (120KB).',
         },
       });
       return;
@@ -78,8 +81,9 @@ async function bootstrap() {
 
   // 3. Rate Limiting Global por IP (Anti-Fuerza Bruta, Anti-Scraping y Anti-DoS)
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === 'OPTIONS') return next();
+    if (req.method === 'OPTIONS' || req.url === '/api/health') return next();
     const clientIp =
+      req.ip ||
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket.remoteAddress ||
       'unknown';
@@ -122,6 +126,18 @@ async function bootstrap() {
     next();
   });
 
+  // Healthcheck ligero para monitoreo en producción (Render / Railway / Uptime)
+  if (expressApp && typeof expressApp.get === 'function') {
+    expressApp.get('/api/health', (_req: Request, res: Response) => {
+      res.status(200).json({
+        success: true,
+        status: 'ok',
+        service: 'kuropunk-api',
+        timestamp: new Date().toISOString(),
+      });
+    });
+  }
+
   // Global API Route Prefix
   app.setGlobalPrefix('api');
 
@@ -141,7 +157,7 @@ async function bootstrap() {
   const port = process.env.PORT || 4000;
   await app.listen(port, '0.0.0.0');
 
-  logger.log(`⚡ KUROPUNK // VANDAL STITCH API running on: http://localhost:${port}/api`);
+  logger.log(`⚡ KUROPUNK API running on: http://localhost:${port}/api`);
   const dbType = process.env.DB_TYPE || (process.env.DATABASE_URL ? 'postgres' : 'sqlite');
   logger.log(
     `⚡ Database target: ${

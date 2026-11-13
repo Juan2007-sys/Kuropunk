@@ -79,28 +79,27 @@ export const Footer = ({ setCurrentView }) => {
             <span className="w-1.5 h-1.5 bg-[#e0141f]"></span> Instagram Oficial (@kuropunk_)
           </a>
           <a
-            href="https://discord.com"
+            href="https://wa.me/573238937221"
             target="_blank"
             rel="noopener noreferrer"
             className="font-body-md text-sm text-[#e7bcb8]/70 hover:text-[#ffb4ab] transition-colors flex items-center gap-2 min-h-[40px]"
           >
-            <span className="w-1.5 h-1.5 bg-[#ffb4ab]"></span> Discord // Colectivo KuroPunk
+            <span className="w-1.5 h-1.5 bg-[#25D366]"></span> WhatsApp Taller (+57 323 8937221)
           </a>
-          <a
-            href="https://youtube.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-body-md text-sm text-[#e7bcb8]/70 hover:text-[#ffb4ab] transition-colors flex items-center gap-2 min-h-[40px]"
+          <button
+            type="button"
+            onClick={() => setCurrentView('contact')}
+            className="text-left font-body-md text-sm text-[#e7bcb8]/70 hover:text-[#ffb4ab] transition-colors flex items-center gap-2 min-h-[40px]"
           >
-            <span className="w-1.5 h-1.5 bg-[#c7c6c2]"></span> Bitácora del Taller & Vídeos
-          </a>
+            <span className="w-1.5 h-1.5 bg-[#ffb4ab]"></span> Cotizar Amigurumi Personalizado
+          </button>
         </div>
       </div>
 
       {/* Bottom Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-16 mt-12 pt-4 border-t border-[#5e3f3c] flex flex-col sm:flex-row justify-between items-center gap-2 font-label-caps text-xs text-[#ae8883]">
-        <span>© 2026 KUROPUNK // TODOS LOS DERECHOS RESERVADOS.</span>
-        <span className="font-mono tracking-widest text-[#e0141f]">ARTEFACTOS HECHOS A MANO // EDICIÓN ARTESANAL</span>
+        <span>© 2026 KUROPUNK · TODOS LOS DERECHOS RESERVADOS.</span>
+        <span className="font-mono tracking-widest text-[#e0141f]">ARTEFACTOS HECHOS A MANO · EDICIÓN ARTESANAL</span>
       </div>
     </footer>
   );

@@ -59,16 +59,19 @@ export class CartService {
       });
     }
 
-    const shippingCost = subtotal >= 120 ? 0 : 12.0;
+    const shippingCost = 0; // Entrega personal acordada en Colombia
     const total = subtotal + shippingCost;
+    const requiresDeposit = total >= 50000;
+    const depositRequiredAmount = requiresDeposit ? Math.ceil(total * 0.20) : 0;
 
     return {
       items: validatedItems,
       subtotal,
       shippingCost,
       total,
-      freeShippingThreshold: 120.0,
-      remainingForFreeShipping: Math.max(0, 120.0 - subtotal),
+      requiresDeposit,
+      depositRequiredAmount,
+      remainingBalance: total - depositRequiredAmount,
     };
   }
 }

@@ -11,6 +11,7 @@ import {
   IsOptional,
   Min,
   Max,
+  MinLength,
   MaxLength,
   Matches,
 } from 'class-validator';
@@ -86,10 +87,12 @@ export class CreateOrderDto {
   email: string;
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty({ message: 'El número de celular es obligatorio' })
   @MaxLength(30)
-  @Matches(NO_XSS_REGEX, { message: 'El teléfono contiene caracteres inválidos.' })
-  phone?: string;
+  @Matches(/^\s*(?:\+?57\s*)?(?:\d[\s-]*){10}$/, {
+    message: 'El número de celular debe tener exactamente 10 dígitos.',
+  })
+  phone: string;
 
   @IsString()
   @IsNotEmpty({ message: 'La dirección de entrega es obligatoria' })
@@ -149,4 +152,24 @@ export class CreateOrderDto {
   @IsOptional()
   @Min(0)
   total?: number;
+
+  @IsString()
+  @IsOptional()
+  @MinLength(4, { message: 'La referencia de transferencia debe tener al menos 4 caracteres.' })
+  @MaxLength(120)
+  @Matches(NO_XSS_REGEX, { message: 'La referencia contiene caracteres no permitidos.' })
+  paymentReference?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(60000)
+  @Matches(/^(data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s<>"]+)$/, {
+    message: 'La captura del comprobante debe ser una imagen válida (JPEG, PNG o WebP).',
+  })
+  paymentProofUrl?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  depositRequiredAmount?: number;
 }

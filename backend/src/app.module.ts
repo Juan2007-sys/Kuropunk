@@ -27,6 +27,7 @@ import { AdminModule } from './modules/admin/admin.module';
       useFactory: (config: ConfigService) => {
         const dbType = config.get<string>('DB_TYPE') || (config.get<string>('DATABASE_URL') ? 'postgres' : 'sqlite');
         const isPostgres = dbType === 'postgres';
+        const shouldSynchronize = config.get<string>('DB_SYNCHRONIZE', 'true') !== 'false';
 
         if (isPostgres) {
           const databaseUrl = config.get<string>('DATABASE_URL');
@@ -49,7 +50,7 @@ import { AdminModule } from './modules/admin/admin.module';
               ReviewEntity,
               ContactMessageEntity,
             ],
-            synchronize: true,
+            synchronize: shouldSynchronize,
             logging: false,
           };
         }
@@ -64,7 +65,7 @@ import { AdminModule } from './modules/admin/admin.module';
             ReviewEntity,
             ContactMessageEntity,
           ],
-          synchronize: true,
+          synchronize: shouldSynchronize,
           logging: false,
         };
       },

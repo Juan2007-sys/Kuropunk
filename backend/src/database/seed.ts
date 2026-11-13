@@ -53,11 +53,11 @@ const INITIAL_PRODUCTS = [
   // 0. PRODUCTOS ACTIVOS EN TIENDA (COLOMBIA)
   {
     id: "jungkook-cooky-plataforma",
-    sku: "JK-01 // FLAGSHIP",
+    sku: "JK-01 · FLAGSHIP",
     title: "Jungkook con Pijama de Cooky (14cm Plataforma)",
     subtitle: "Edición Limitada Coleccionable con Plataforma",
     category: "Idol Flagship",
-    series: "BTS // Series 01",
+    series: "BTS · Series 01",
     type: "amigurumi",
     price: 50000,
     originalPrice: 65000,
@@ -86,11 +86,11 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "dulce-princesa-plataforma",
-    sku: "AT-01 // CANDY",
+    sku: "AT-01 · CANDY",
     title: "Dulce Princesa de Hora de Aventura",
     subtitle: "Edición Limitada Coleccionable con Plataforma (15cm)",
     category: "Series & Rogues",
-    series: "Adventure Time // Series 01",
+    series: "Adventure Time · Series 01",
     type: "amigurumi",
     price: 50000,
     originalPrice: 65000,
@@ -118,11 +118,11 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "jungkook-cooky-pequeno",
-    sku: "JK-02 // ALLEY KAT",
-    title: "Jungkook con Pijama de Cooky (Sin Plataforma // 6.5cm)",
+    sku: "JK-02 · ALLEY KAT",
+    title: "Jungkook con Pijama de Cooky (Sin Plataforma · 6.5cm)",
     subtitle: "Miniatura Coleccionable de Bolsillo (6.5cm)",
     category: "Alley Minis",
-    series: "BTS Mini // Series 01",
+    series: "BTS Mini · Series 01",
     type: "amigurumi",
     price: 12000,
     originalPrice: 18000,
@@ -152,7 +152,7 @@ const INITIAL_PRODUCTS = [
   // 1. Amigurumis
   {
     id: "the-wanderer",
-    sku: "RX-00 // FLAGSHIP",
+    sku: "RX-00 · FLAGSHIP",
     title: "The Wanderer",
     subtitle: "Artisan Collectible with Staff",
     category: "Rogues",
@@ -515,7 +515,7 @@ const INITIAL_PRODUCTS = [
   // 2. Punto Cruz Products
   {
     id: "punto-cruz-kuropunk-cat",
-    sku: "PC-01 // SIGNATURE",
+    sku: "PC-01 · SIGNATURE",
     title: "KuroPunk Cat & Electric Bass",
     subtitle: "Gráfico Punto Cruz Oficial KuroPunk",
     category: "Punto Cruz",
@@ -545,7 +545,7 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "punto-cruz-graffiti-skull",
-    sku: "PC-02 // SKULL SERIES",
+    sku: "PC-02 · SKULL SERIES",
     title: "Graffiti Skull & Needles",
     subtitle: "Calavera Urbana con Agujas Cruzadas",
     category: "Punto Cruz",
@@ -574,7 +574,7 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "punto-cruz-vandal-spray",
-    sku: "PC-03 // STREET GEAR",
+    sku: "PC-03 · STREET GEAR",
     title: "Vandal Aerosol Can",
     subtitle: "Lata de Graffiti Gachiakuta en Pixel Art",
     category: "Punto Cruz",
@@ -603,7 +603,7 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "punto-cruz-cyber-mecha",
-    sku: "PC-04 // TECHNO",
+    sku: "PC-04 · TECHNO",
     title: "Mecha Cyberpunk Skull",
     subtitle: "Diseño Cibernético en Punto de Cruz",
     category: "Punto Cruz",
@@ -634,7 +634,7 @@ const INITIAL_PRODUCTS = [
   // 3. Patrones de Crochet (Digital Blueprints)
   {
     id: "patron-the-wanderer",
-    sku: "PT-01 // MASTER BLUEPRINT",
+    sku: "PT-01 · MASTER BLUEPRINT",
     title: "Patrón: The Wanderer Amigurumi",
     subtitle: "Guía Maestra Paso a Paso con Fotos HD",
     category: "Patrones",
@@ -650,7 +650,7 @@ const INITIAL_PRODUCTS = [
     yarn: "240m Lana Acrílica Alta Torsión Carbón + Naranja",
     height: "8.5 Pulgadas",
     pages: "38 Páginas con 110 Fotografías",
-    difficulty: "Experto // Brutal",
+    difficulty: "Experto · Brutal",
     stitches: "AM, PB, MPA, PA, AUM, DISM, BLO",
     estimatedTime: "12-14 Horas",
     description: "El patrón oficial completo para recrear a The Wanderer. Incluye plantilla para ensamblado del báculo con cristal, mochila táctica miniatura y técnicas de articulación interna.",
@@ -665,7 +665,7 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "patron-vandal-bear",
-    sku: "PT-02 // ALLEY SERIES",
+    sku: "PT-02 · ALLEY SERIES",
     title: "Patrón: Vandal Bear",
     subtitle: "Guía de Tejido Oso Punk con Mini Aerosol",
     category: "Patrones",
@@ -695,7 +695,7 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "patron-scrap-bunny",
-    sku: "PT-03 // ALLEY SERIES",
+    sku: "PT-03 · ALLEY SERIES",
     title: "Patrón: Scrap Bunny",
     subtitle: "Guía de Tejido Conejo Postapocalíptico",
     category: "Patrones",
@@ -724,7 +724,7 @@ const INITIAL_PRODUCTS = [
   },
   {
     id: "patron-rat-king-edc",
-    sku: "PT-04 // HARDWARE",
+    sku: "PT-04 · HARDWARE",
     title: "Patrón: Rat King EDC Mascot",
     subtitle: "Mini Rata de Bolsillo con Gorro Rojo",
     category: "Patrones",
@@ -740,7 +740,7 @@ const INITIAL_PRODUCTS = [
     yarn: "70m Acrílico Asfalto + Rojo",
     height: "4.5 Pulgadas",
     pages: "16 Páginas con Diagrama",
-    difficulty: "Principiante // Rápido",
+    difficulty: "Principiante · Rápido",
     stitches: "AM, PB, AUM, DISM",
     estimatedTime: "3-4 Horas",
     description: "Proyecto rápido y adictivo para tejer en una tarde. Perfecto para llaveros y regalos urbanos con alfiler de gancho auténtico.",
@@ -792,24 +792,43 @@ async function seed() {
   const productRepo = AppDataSource.getRepository(ProductEntity);
   const reviewRepo = AppDataSource.getRepository(ReviewEntity);
 
-  console.log(`📦 Seeding ${INITIAL_PRODUCTS.length} products...`);
+  console.log(`📦 Checking ${INITIAL_PRODUCTS.length} catalog products (preserving live stock & prices)...`);
   for (const prod of INITIAL_PRODUCTS) {
     const existing = await productRepo.findOne({ where: { id: prod.id } });
     if (!existing) {
       const entity = productRepo.create(prod as any);
       await productRepo.save(entity);
-      console.log(`  + Seeded product: [${prod.sku}] ${prod.title}`);
+      console.log(`  + Seeded new product: [${prod.sku}] ${prod.title}`);
     } else {
-      Object.assign(existing, prod);
+      const preservedStock = existing.stock;
+      const preservedPrice = existing.price;
+      const preservedBadge = existing.badge;
+      const preservedBadgeType = existing.badgeType;
+      const preservedRating = existing.rating;
+      const preservedReviewsCount = existing.reviewsCount;
+
+      Object.assign(existing, prod, {
+        stock: typeof preservedStock === 'number' ? preservedStock : prod.stock,
+        price: typeof preservedPrice === 'number' && preservedPrice > 0 ? preservedPrice : prod.price,
+        badge: preservedBadge || prod.badge,
+        badgeType: preservedBadgeType || prod.badgeType,
+        rating: typeof preservedRating === 'number' ? preservedRating : prod.rating,
+        reviewsCount:
+          typeof preservedReviewsCount === 'number' ? preservedReviewsCount : prod.reviewsCount,
+      });
       await productRepo.save(existing);
-      console.log(`  ~ Updated product with COP price: [${prod.sku}] ${prod.title} -> $${prod.price} COP`);
     }
   }
 
-  console.log(`💬 Seeding ${INITIAL_REVIEWS.length} initial reviews...`);
+  console.log(`💬 Checking ${INITIAL_REVIEWS.length} initial reviews (idempotent)...`);
   for (const rev of INITIAL_REVIEWS) {
-    const reviewEntity = reviewRepo.create(rev);
-    await reviewRepo.save(reviewEntity);
+    const existingRev = await reviewRepo.findOne({
+      where: { productId: rev.productId, author: rev.author },
+    });
+    if (!existingRev) {
+      const reviewEntity = reviewRepo.create(rev);
+      await reviewRepo.save(reviewEntity);
+    }
   }
 
   console.log('🏁 Database seeding finished successfully.');

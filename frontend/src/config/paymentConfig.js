@@ -9,26 +9,10 @@ export const DEPOSIT_PERCENTAGE = 0.20;
 export const PAYMENT_ACCOUNTS = [
   {
     id: 'bre_b',
-    label: 'Llave Bre-B (Inmediato)',
+    label: 'Llave Bre-B Oficial',
     key: import.meta.env.VITE_PAYMENT_KEY_BREB || '@NEQUILAU59554',
     holder: import.meta.env.VITE_PAYMENT_HOLDER || 'KuroPunk Taller',
-    bank: 'Red Interbancaria Bre-B (Todos los bancos)',
-    badge: 'RECOMENDADO',
-  },
-  {
-    id: 'nequi',
-    label: 'Desde Nequi (Bre-B)',
-    key: import.meta.env.VITE_PAYMENT_KEY_NEQUI || '@NEQUILAU59554',
-    holder: import.meta.env.VITE_PAYMENT_HOLDER || 'KuroPunk Taller',
-    bank: 'Envío por Llave Bre-B en Nequi',
-    badge: 'ENVÍO DIRECTO',
-  },
-  {
-    id: 'bancolombia',
-    label: 'Desde Bancolombia / Otros',
-    key: import.meta.env.VITE_PAYMENT_KEY_BANCOLOMBIA || '@NEQUILAU59554',
-    holder: import.meta.env.VITE_PAYMENT_HOLDER || 'KuroPunk Taller',
-    bank: 'Transferencia a Llave Bre-B',
-    badge: 'SIN COSTO',
+    bank: 'Válida desde Nequi, Bancolombia, Daviplata y cualquier banco en Colombia',
+    badge: 'ÚNICA LLAVE OFICIAL',
   },
 ];

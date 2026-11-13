@@ -12,7 +12,9 @@ import { AdminGuard } from './guards/AdminGuard';
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from './data/products';
 import { AnimatePresence, motion } from 'framer-motion';
 import Lenis from 'lenis';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
+import { subscribeToOrderById } from './services/firebase';
+import { trackOrder } from './services/api';
 
 // Catálogo unificado para resolución directa de URLs compartidas y navegación
 const ALL_CATALOG_PRODUCTS = [...PRODUCTS, ...(PUNTO_CRUZ_PRODUCTS || []), ...(PATRONES_PRODUCTS || [])];
@@ -63,7 +65,7 @@ const PageLoadingFallback = () => (
   <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-8 space-y-3">
     <div className="w-8 h-8 border-2 border-[#e0141f] border-t-transparent animate-spin rounded-full"></div>
     <span className="text-[11px] font-mono text-neutral-400 tracking-widest uppercase">
-      CARGANDO MÓDULO // KUROPUNK
+      CARGANDO MÓDULO · KUROPUNK
     </span>
   </div>
 );
@@ -84,8 +86,76 @@ export function AppContent() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isWorkshopHUDOpen, setIsWorkshopHUDOpen] = useState(false);
   const [isAuthenticityOpen, setIsAuthenticityOpen] = useState(false);
+  const [depositNoticeBanner, setDepositNoticeBanner] = useState(null);
   const { setIsCartOpen } = useCart();
   const { currentUser, isAdmin } = useAuth();
+
+  // Suscripción global para avisar al cliente en tiempo real cuando el Admin acepta o rechaza su anticipo
+  useEffect(() => {
+    if (currentView === 'admin') return;
+
+    let activeUnsub = () => {};
+    let currentWatchedId = null;
+
+    const checkAndNotify = (orderData) => {
+      if (!orderData?.id) return;
+      const paySt = String(orderData.paymentStatus || '').toUpperCase();
+      if (paySt !== 'ANTICIPO_VERIFICADO' && paySt !== 'RECHAZADO') return;
+
+      const notifyKey = `${orderData.id}_${paySt}`;
+      try {
+        const notifiedList = JSON.parse(localStorage.getItem('kuropunk_notified_orders') || '[]');
+        if (notifiedList.includes(notifyKey)) return;
+        notifiedList.push(notifyKey);
+        localStorage.setItem('kuropunk_notified_orders', JSON.stringify(notifiedList));
+      } catch {}
+
+      setDepositNoticeBanner({
+        id: orderData.id,
+        trackingCode: orderData.trackingCode || orderData.trackingNumber || orderData.id,
+        status: paySt,
+      });
+
+      if (paySt === 'ANTICIPO_VERIFICADO') {
+        toast.success(`¡Tu anticipo para la orden #${orderData.id} fue aceptado! Ya estás en la Cola de Producción.`);
+      } else {
+        toast.error(`Tu comprobante para la orden #${orderData.id} no pudo ser validado. Revisa el rastreo de tu pedido.`);
+      }
+    };
+
+    const syncWatcher = async () => {
+      try {
+        const lastRaw = localStorage.getItem('kuropunk_last_order');
+        if (!lastRaw) return;
+        const lastOrder = JSON.parse(lastRaw);
+        if (!lastOrder?.id) return;
+
+        if (currentWatchedId !== lastOrder.id) {
+          activeUnsub();
+          currentWatchedId = lastOrder.id;
+          activeUnsub = subscribeToOrderById(lastOrder.id, (live) => {
+            checkAndNotify(live);
+          });
+        }
+
+        if (
+          String(lastOrder.status || '').toUpperCase() === 'VERIFICANDO_ANTICIPO' ||
+          String(lastOrder.paymentStatus || '').toUpperCase() === 'VERIFICANDO_ANTICIPO'
+        ) {
+          const tracked = await trackOrder(lastOrder.id).catch(() => null);
+          if (tracked) checkAndNotify(tracked);
+        }
+      } catch {}
+    };
+
+    syncWatcher();
+    const intervalId = setInterval(syncWatcher, 6000);
+
+    return () => {
+      activeUnsub();
+      clearInterval(intervalId);
+    };
+  }, [currentView]);
 
   // Navegación sincronizada con el historial nativo del navegador (PushState + Hash)
   const navigateTo = useCallback((view, product = null, replace = false) => {
@@ -230,6 +300,44 @@ export function AppContent() {
         onOpenWorkshopHUD={() => setIsWorkshopHUDOpen(true)}
         onOpenAuthenticity={() => setIsAuthenticityOpen(true)}
       />
+
+      {/* 2.1 Banner Global en Tiempo Real cuando el Admin acepta o rechaza el anticipo */}
+      {depositNoticeBanner && (
+        <div
+          className={`relative z-40 px-4 py-3 border-b-2 font-mono text-xs flex flex-wrap items-center justify-between gap-3 ${
+            depositNoticeBanner.status === 'ANTICIPO_VERIFICADO'
+              ? 'bg-emerald-950/95 border-[#25D366] text-emerald-100'
+              : 'bg-red-950/95 border-[#e0141f] text-red-100'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-bold uppercase text-sm text-white">
+              {depositNoticeBanner.status === 'ANTICIPO_VERIFICADO'
+                ? `✓ ¡Pago Aceptado! Tu orden #${depositNoticeBanner.id} ya entró a la Cola Oficial de Producción.`
+                : `⚠ Tu comprobante de la orden #${depositNoticeBanner.id} requiere revisión.`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsTrackingOpen(true);
+                setDepositNoticeBanner(null);
+              }}
+              className="px-3 py-1.5 bg-[#25D366] text-black font-bold uppercase text-[11px]"
+            >
+              Ver Estado del Pedido
+            </button>
+            <button
+              type="button"
+              onClick={() => setDepositNoticeBanner(null)}
+              className="px-2 py-1 text-neutral-300 hover:text-white border border-neutral-600 uppercase text-[10px]"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 3. Global Command Palette (⌘K) - Lazy Loaded */}
       {isCommandOpen && (
@@ -376,12 +484,58 @@ export function AppContent() {
   );
 }
 
+class ProductionErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('[KuroPunk ErrorBoundary]', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#080808] text-[#e6e1e1] flex flex-col items-center justify-center p-6 text-center">
+          <div className="max-w-md border-2 border-[#e0141f] bg-[#141313] p-8 space-y-4">
+            <h1 className="font-headline-md text-3xl text-[#fff4f3] uppercase">
+              INTERRUPCIÓN TEMPORAL EN PANTALLA
+            </h1>
+            <p className="font-mono text-xs text-neutral-300 leading-relaxed">
+              Ocurrió un inconveniente inesperado al cargar esta vista. Tu carrito y sesión están protegidos.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                this.setState({ hasError: false });
+                window.location.hash = '#/';
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-[#e0141f] hover:bg-[#ff1f2d] text-white font-headline-md text-lg uppercase tracking-wider"
+            >
+              RECARGAR TIENDA KUROPUNK
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <AppContent />
-      </CartProvider>
-    </AuthProvider>
+    <ProductionErrorBoundary>
+      <AuthProvider>
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
+      </AuthProvider>
+    </ProductionErrorBoundary>
   );
 }

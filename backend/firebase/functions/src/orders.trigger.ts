@@ -157,8 +157,13 @@ export const onOrderUpdated = onDocumentUpdated('orders/{orderId}', async (event
 
   if (!before || !after) return;
 
-  // Check if status changed to 'shipped'
-  if (before.status !== 'shipped' && after.status === 'shipped') {
+  const prevStatus = String(before.status || '').toLowerCase();
+  const nextStatus = String(after.status || '').toLowerCase();
+  const isShippingTransition =
+    (nextStatus === 'shipped' || nextStatus === 'dispatched') &&
+    prevStatus !== nextStatus;
+
+  if (isShippingTransition) {
     const orderId = after.id || event.params.orderId;
     const trackingCode = after.trackingNumber || after.trackingCode || `KP-TRK-${orderId}`;
     const customerName = after.customerData?.name || after.customerName || 'Cliente KuroPunk';
@@ -166,6 +171,7 @@ export const onOrderUpdated = onDocumentUpdated('orders/{orderId}', async (event
     const cleanPhone = normalizePhone(rawPhone);
     const destination = after.customerData?.shippingAddress || `${after.address || ''}, ${after.city || ''}`;
     const totalCOP = formatCOP(after.totalAmount || after.total || 0);
+    const storefrontUrl = (process.env.FRONTEND_URL || 'https://kuropunk.vercel.app').replace(/\/+$/, '');
 
     const message =
       `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
@@ -177,7 +183,7 @@ export const onOrderUpdated = onDocumentUpdated('orders/{orderId}', async (event
       `▪️ *Total a Pagar:* *${totalCOP}* (Efectivo / Nequi / Daviplata)\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
       `🔎 *Código de Rastreo:* \`${trackingCode}\`\n` +
-      `🚚 *Seguimiento en línea:* https://kuropunk.com/rastreo/${trackingCode}\n` +
+      `🚚 *Seguimiento en línea:* ${storefrontUrl}/#/ (Ingresa tu código ${trackingCode})\n` +
       `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
       `El mensajero te contactará a este número antes de llegar a tu dirección. Ten a mano el valor exacto o tu app de Nequi/Daviplata. 🧶🖤`;
 

@@ -13,7 +13,11 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { ReportPaymentDto, VerifyDepositDto } from './dto/report-payment.dto';
+import {
+  ReportPaymentDto,
+  VerifyDepositDto,
+  UpdateOrderStatusDto,
+} from './dto/report-payment.dto';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 
 @Controller('orders')
@@ -64,11 +68,12 @@ export class OrdersController {
 
   @Patch(':id/status')
   @UseGuards(AdminAuthGuard)
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
   async updateStatus(
     @Param('id') id: string,
-    @Body('status') status: string,
+    @Body() updateStatusDto: UpdateOrderStatusDto,
   ) {
-    return this.ordersService.updateStatus(id, status);
+    return this.ordersService.updateStatus(id, updateStatusDto.status);
   }
 
   @Delete(':id')

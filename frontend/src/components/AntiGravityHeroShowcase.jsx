@@ -279,8 +279,8 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
             <span className="w-1.5 h-1.5 rounded-full bg-[#e0141f] animate-ping" />
             <span translate="no">
               {activeProduct.technique === 'punto_cruz'
-                ? 'PUNTO CRUZ // GRÁFICO DMC'
-                : 'AMIGURUMI // SERIE LIMITADA'}
+                ? 'PUNTO CRUZ · GRÁFICO DMC'
+                : 'AMIGURUMI · SERIE LIMITADA'}
             </span>
           </div>
           <div className="font-accent-tag text-xs sm:text-sm text-[#fff4f3] uppercase tracking-wider flex items-center gap-2">

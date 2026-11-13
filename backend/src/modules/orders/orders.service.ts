@@ -153,6 +153,11 @@ export class OrdersService {
         const total = subtotal + shippingCost;
         const trackingCode = `KURO-TRK-${randomUUID().replace(/-/g, '').substring(0, 7).toUpperCase()}`;
 
+        const cleanPhone = (createOrderDto.phone || '').replace(/\D/g, '').replace(/^57(?=\d{10}$)/, '');
+        if (cleanPhone.length !== 10) {
+          throw new BadRequestException('El número de celular o WhatsApp debe tener exactamente 10 dígitos.');
+        }
+
         // REGLA BLINDADA DE LOS $50.000 COP (Calculada estrictamente en el servidor)
         const requiresDeposit = total >= DEPOSIT_THRESHOLD_COP;
         let depositBaseAmount = 0;
@@ -161,42 +166,47 @@ export class OrdersService {
         let paymentStatus = 'NO_REQUIERE';
         let orderStatus = 'EN_COLA';
         let queuedAt: Date | null = new Date();
+        let paymentReference: string | null = null;
+        let paymentProofUrl: string | null = null;
+        let paymentReportedAt: Date | null = null;
 
         if (requiresDeposit) {
+          // Anticipo exacto del 20% sin pesos aleatorios adicionales
           depositBaseAmount = Math.ceil(total * 0.20);
+          depositRequiredAmount = depositBaseAmount;
           remainingBalance = total - depositBaseAmount;
-          paymentStatus = 'PENDIENTE_ANTICIPO';
-          orderStatus = 'ESPERANDO_PAGO';
           queuedAt = null; // No entra a la cola hasta verificar el anticipo
 
-          // Candado Anti-Fraude de Monto Único (1 a 99 pesos colombianos no usados en los últimos 30 min)
-          const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
-          const recentPending = await manager
-            .createQueryBuilder(OrderEntity, 'o')
-            .select(['o.depositRequiredAmount'])
-            .where('o.status = :st AND o.createdAt >= :since', {
-              st: 'ESPERANDO_PAGO',
-              since: thirtyMinsAgo,
-            })
-            .getMany();
-
-          const usedAmounts = new Set(
-            recentPending.map((o) => Math.round(Number(o.depositRequiredAmount))),
-          );
-
-          const availableOffsets: number[] = [];
-          for (let offset = 1; offset <= 99; offset++) {
-            if (!usedAmounts.has(depositBaseAmount + offset)) {
-              availableOffsets.push(offset);
-            }
+          const cleanRef = (createOrderDto.paymentReference || '').trim().toUpperCase();
+          if (!cleanRef || cleanRef.length < 4) {
+            throw new BadRequestException(
+              'Debes ingresar el número de comprobante o referencia (mínimo 4 caracteres) para agendar un pedido desde $50.000 COP.',
+            );
           }
 
-          const uniquePesos =
-            availableOffsets.length > 0
-              ? availableOffsets[Math.floor(Math.random() * availableOffsets.length)]
-              : Math.floor(Math.random() * 99) + 1;
+          const rawProof = (createOrderDto.paymentProofUrl || '').trim();
+          if (!rawProof || rawProof.startsWith('blob:')) {
+            throw new BadRequestException(
+              'Debes adjuntar obligatoriamente la foto o captura del comprobante de pago para agendar el pedido.',
+            );
+          }
 
-          depositRequiredAmount = depositBaseAmount + uniquePesos;
+          const duplicateRefOrder = await manager
+            .createQueryBuilder(OrderEntity, 'o')
+            .where('UPPER(o.paymentReference) = :ref', { ref: cleanRef })
+            .getOne();
+
+          if (duplicateRefOrder) {
+            throw new ConflictException(
+              `El comprobante o referencia "${cleanRef}" ya fue registrado anteriormente en otro pedido. Verifica el número de tu transferencia.`,
+            );
+          }
+
+          paymentReference = cleanRef;
+          paymentProofUrl = rawProof;
+          paymentReportedAt = new Date();
+          paymentStatus = 'VERIFICANDO_ANTICIPO';
+          orderStatus = 'VERIFICANDO_ANTICIPO';
         }
 
         const addressSegments = [
@@ -214,7 +224,7 @@ export class OrdersService {
           id: orderId,
           customerName: createOrderDto.customerName,
           email: createOrderDto.email,
-          phone: createOrderDto.phone,
+          phone: cleanPhone,
           address: addressSegments.join(' | '),
           city: fullCity,
           country: createOrderDto.country || 'Colombia',
@@ -226,6 +236,9 @@ export class OrdersService {
           depositRequiredAmount,
           remainingBalance,
           paymentStatus,
+          paymentReference,
+          paymentProofUrl,
+          paymentReportedAt,
           queuedAt,
           status: orderStatus,
           trackingCode,
@@ -256,6 +269,13 @@ export class OrdersService {
       throw new BadRequestException('Debes ingresar un número de comprobante o referencia válido.');
     }
 
+    const rawProof = (dto.paymentProofUrl || '').trim();
+    if (!rawProof || rawProof.startsWith('blob:')) {
+      throw new BadRequestException(
+        'Debes adjuntar obligatoriamente la foto o captura del comprobante de transferencia.',
+      );
+    }
+
     return await this.runAtomicTransaction(async (manager) => {
       const order = await manager.findOne(OrderEntity, {
         where: { id: orderId },
@@ -264,6 +284,24 @@ export class OrdersService {
 
       if (!order) {
         throw new NotFoundException(`Orden #${orderId} no encontrada.`);
+      }
+
+      if (!order.requiresDeposit) {
+        throw new BadRequestException(`La orden #${orderId} no requiere pago de anticipo.`);
+      }
+
+      const currentStatus = (order.status || '').toUpperCase();
+      const currentPayStatus = (order.paymentStatus || '').toUpperCase();
+      const canReport =
+        currentStatus === 'ESPERANDO_PAGO' ||
+        currentStatus === 'VERIFICANDO_ANTICIPO' ||
+        currentPayStatus === 'RECHAZADO' ||
+        currentPayStatus === 'PENDIENTE_ANTICIPO';
+
+      if (!canReport || currentPayStatus === 'ANTICIPO_VERIFICADO') {
+        throw new ConflictException(
+          `La orden #${orderId} ya fue verificada o procesada y no permite reemplazar el comprobante.`,
+        );
       }
 
       // Candado Anti-Fraude: Verificar que esta referencia de pago NUNCA haya sido usada en otro pedido
@@ -282,9 +320,7 @@ export class OrdersService {
       }
 
       order.paymentReference = cleanRef;
-      if (dto.paymentProofUrl) {
-        order.paymentProofUrl = dto.paymentProofUrl.trim();
-      }
+      order.paymentProofUrl = rawProof;
       order.paymentReportedAt = new Date();
       order.paymentStatus = 'VERIFICANDO_ANTICIPO';
       order.status = 'VERIFICANDO_ANTICIPO';
@@ -299,7 +335,7 @@ export class OrdersService {
   async verifyDeposit(orderId: string, dto: VerifyDepositDto): Promise<OrderEntity> {
     const action = (dto.action || '').toUpperCase();
 
-    return await this.runAtomicTransaction(async (manager) => {
+    const savedOrder = await this.runAtomicTransaction(async (manager) => {
       const order = await manager.findOne(OrderEntity, {
         where: { id: orderId },
         relations: ['items'],
@@ -322,6 +358,14 @@ export class OrdersService {
 
       return await manager.save(OrderEntity, order);
     });
+
+    if (action === 'CONFIRM') {
+      this.whatsappService
+        .dispatchOrderStatusNotification(savedOrder, 'confirmed')
+        .catch(() => {});
+    }
+
+    return savedOrder;
   }
 
   async findOne(id: string): Promise<OrderEntity> {
@@ -488,14 +532,22 @@ export class OrdersService {
     if (!order) {
       return { success: true, id };
     }
-    await this.orderItemRepo.delete({ order: { id } });
-    await this.orderRepo.delete({ id });
+    await this.orderItemRepo
+      .createQueryBuilder()
+      .delete()
+      .where('orderId = :id', { id })
+      .execute();
+    await this.orderRepo
+      .createQueryBuilder()
+      .delete()
+      .where('id = :id', { id })
+      .execute();
     return { success: true, id };
   }
 
   async clearAll(): Promise<{ success: boolean; count: number }> {
-    await this.orderItemRepo.delete({});
-    const res = await this.orderRepo.delete({});
+    await this.orderItemRepo.createQueryBuilder().delete().execute();
+    const res = await this.orderRepo.createQueryBuilder().delete().execute();
     return { success: true, count: res.affected || 0 };
   }
 }

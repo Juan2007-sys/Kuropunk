@@ -38,7 +38,7 @@ export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
             >
               {/* Corner Tape */}
               <div className="tape-overlay !top-[-10px] !right-12 !left-auto">
-                ARSENAL // CARRITO
+                ARSENAL · CARRITO
               </div>
 
               {/* Header */}
@@ -189,7 +189,7 @@ export const CartDrawer = ({ onCheckout, onExploreCatalog }) => {
 
                   <div className="flex items-center justify-center gap-2 text-[10px] text-[#8a8a86] font-mono uppercase">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#ffb4ab]" />
-                    Entrega Acordada // Pago al Recibir en Mano
+                    Entrega Acordada · Pago al Recibir en Mano
                   </div>
                 </div>
               )}

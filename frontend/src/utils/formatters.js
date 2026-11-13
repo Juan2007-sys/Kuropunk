@@ -1,7 +1,7 @@
 // KuroPunk Utilities: Currency formatting in Colombian Pesos (COP) & WhatsApp Integration
 
-export const WHATSAPP_PHONE = '573015690382';
-export const WHATSAPP_PHONE_DISPLAY = '+57 301 569 0382';
+export const WHATSAPP_PHONE = '573238937221';
+export const WHATSAPP_PHONE_DISPLAY = '+57 323 8937221';
 
 /**
  * Formats a number to Colombian Pesos (COP)
@@ -53,15 +53,34 @@ export function generateWhatsAppOrderUrl(order) {
     year: 'numeric',
   });
 
-  let grandTotal = Number(order.total);
+  let grandTotal = Number(order.total || order.totalAmount || 0);
   if (grandTotal > 0 && grandTotal < 1000) {
     grandTotal = grandTotal * 1000;
   }
 
-  const message = `🧶 *KUROPUNK* | *Nueva Orden Contraentrega*
+  const requiresDeposit =
+    order.requiresDeposit !== undefined ? Boolean(order.requiresDeposit) : grandTotal >= 50000;
+  const depositPaid = Number(
+    order.depositRequiredAmount || order.depositBaseAmount || (requiresDeposit ? Math.ceil(grandTotal * 0.2) : 0),
+  );
+  const remainingBalance = Number(
+    order.remainingBalance !== undefined ? order.remainingBalance : grandTotal - depositPaid,
+  );
+
+  const paymentSummaryBlock = requiresDeposit
+    ? `💰 *TOTAL DEL PEDIDO:* ${formatCOP(grandTotal)}\n` +
+      `✅ *ANTICIPO REPORTADO (20%):* *${formatCOP(depositPaid)}*${
+        order.paymentReference ? ` (Ref: #${order.paymentReference})` : ''
+      }\n` +
+      `💵 *SALDO AL RECIBIR (80%):* *${formatCOP(remainingBalance)}*`
+    : `💰 *TOTAL A PAGAR AL RECIBIR:* *${formatCOP(grandTotal)}*`;
+
+  const message = `🧶 *KUROPUNK* | *${requiresDeposit ? 'Orden con Anticipo 20%' : 'Nueva Orden Contraentrega'}*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
-¡Hola equipo KuroPunk! Acabo de registrar mi pedido en la tienda y quedo a la espera de la entrega personal.
+¡Hola equipo KuroPunk! Acabo de registrar mi pedido en la tienda${
+    requiresDeposit ? ' junto con el comprobante del anticipo del 20%' : ''
+  }.
 
 📋 *DETALLES DEL PEDIDO*
 • *Orden:* #${order.id}
@@ -79,13 +98,44 @@ export function generateWhatsAppOrderUrl(order) {
 ${itemsText}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 *TOTAL A PAGAR AL RECIBIR:* *${formatCOP(grandTotal)}*
-🚚 *MÉTODO:* Pago Contraentrega en Mano (Efectivo / Nequi / Daviplata)
+${paymentSummaryBlock}
+🚚 *MODALIDAD SALDO:* Contraentrega en Mano (Efectivo / Nequi / Daviplata)
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Quedo atento/a para coordinar la hora de entrega en mi dirección. ¡Muchas gracias! 🖤`;
+Quedo atento/a a la confirmación y entrega. ¡Muchas gracias! 🖤`;
 
   return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * Generates a direct WhatsApp notification link from Admin to the Customer when Deposit is Approved or Rejected
+ */
+export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM') {
+  const rawPhone = String(order?.customerData?.phone || order?.phone || '').replace(/\D/g, '');
+  if (!rawPhone) return '';
+  const e164Phone = rawPhone.startsWith('57') && rawPhone.length >= 12 ? rawPhone : `57${rawPhone}`;
+  const customerName = order?.customerData?.name || order?.customerName || 'Cliente';
+  const totalVal = Number(order?.totalAmount || order?.total || 0);
+  const depositVal = Number(order?.depositRequiredAmount || order?.depositBaseAmount || Math.ceil(totalVal * 0.2));
+  const remainingVal = Number(order?.remainingBalance ?? Math.max(0, totalVal - depositVal));
+  const trackingCode = order?.trackingCode || order?.trackingNumber || order?.id;
+
+  const isApproved = String(action).toUpperCase() === 'CONFIRM';
+  const message = isApproved
+    ? `🧶 *KUROPUNK TALLER* | *¡Anticipo Aceptado!*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `¡Hola *${customerName}*! Te confirmamos que hemos verificado y *ACEPTADO* tu anticipo del 20% (*${formatCOP(depositVal)}*) para tu pedido.\n\n` +
+      `✅ *Estado actual:* En Cola Oficial de Producción\n` +
+      `📦 *Orden:* #${order.id}\n` +
+      `🔎 *Código de rastreo:* ${trackingCode}\n` +
+      `💵 *Saldo a pagar al recibir (80%):* *${formatCOP(remainingVal)}*\n\n` +
+      `Ya iniciamos el agendamiento de tu pieza en el taller y te avisaremos por aquí cuando salga a entrega. ¡Muchas gracias por tu compra! 🖤`
+    : `⚠️ *KUROPUNK TALLER* | *Novedad con tu Comprobante*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `Hola *${customerName}*, revisamos el soporte de la orden *#${order.id}* (Ref: ${order.paymentReference || 'N/A'}) por *${formatCOP(depositVal)}*, pero aún no nos refleja en cuenta o la captura no es legible.\n\n` +
+      `Por favor envíanos la foto clara del comprobante por este chat o súbela nuevamente en la página con tu código de rastreo *${trackingCode}*. ¡Quedamos atentos!`;
+
+  return `https://wa.me/${e164Phone}?text=${encodeURIComponent(message)}`;
 }
 
 /**
@@ -100,7 +150,7 @@ export function generateWhatsAppContactUrl({ name, email, type, message }) {
   };
 
   const label = typeLabels[type] || 'Consulta General';
-  const text = `🧶 *KUROPUNK // COMISIÓN ARTESANAL*
+  const text = `🧶 *KUROPUNK · COMISIÓN ARTESANAL*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 ¡Hola equipo KuroPunk! Acabo de enviar una solicitud desde la página web:
 
@@ -120,7 +170,7 @@ export function generateAdminToCustomerWhatsAppUrl(commission) {
   const cleanPhone = String(commission.phone || '').replace(/\D/g, '');
   const destinationPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
 
-  const message = `🧶 *KUROPUNK // ATENCIÓN DE COMISIONES PERSONALIZADAS*
+  const message = `🧶 *KUROPUNK · ATENCIÓN DE COMISIONES PERSONALIZADAS*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 ¡Hola *${commission.name || 'Cliente'}*! 👋
 
@@ -142,7 +192,7 @@ Quiero conocer más a fondo tu cotización y orientarte con los materiales, colo
 }
 
 export function generateCustomerToAdminWhatsAppUrl(commission) {
-  const message = `🧶 *KUROPUNK // SOLICITUD DE COTIZACIÓN*
+  const message = `🧶 *KUROPUNK · SOLICITUD DE COTIZACIÓN*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 ¡Hola equipo KuroPunk! Acabo de calcular una cotización en la tienda web:
 

@@ -1,12 +1,12 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, KeyRound, ArrowLeft } from 'lucide-react';
+import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 /**
- * AdminGuard: Restricts route access strictly to users with role === 'admin' (Custom Claims)
+ * AdminGuard: Restricts route access strictly to users with role === 'admin' (Custom Claims or Firestore Admin Role)
  */
 export function AdminGuard({ children, onBackToShop }) {
-  const { currentUser, isAdmin, loading, setDemoSession } = useAuth();
+  const { currentUser, isAdmin, loading } = useAuth();
 
   if (loading) {
     return (
@@ -26,7 +26,7 @@ export function AdminGuard({ children, onBackToShop }) {
           <ShieldAlert className="w-8 h-8 text-[#e0141f]" />
           <div>
             <h2 className="font-headline-md text-3xl text-[#fff4f3] uppercase tracking-wider">
-              403 // ACCESO DENEGADO
+              403 · ACCESO DENEGADO
             </h2>
             <p className="font-mono text-xs text-[#ffb4ab]">
               REQUERIMIENTO RBAC: ROLE == 'ADMIN' / CUSTOM CLAIM
@@ -36,27 +36,8 @@ export function AdminGuard({ children, onBackToShop }) {
 
         <p className="font-body-md text-sm text-[#e6e1e1] mb-6 leading-relaxed">
           Esta terminal está restringida exclusivamente para los maestros artesanos y administradores de KuroPunk. 
-          Tu cuenta actual (<span className="text-[#ffb4ab] font-mono">{currentUser?.email || 'Sin sesión'}</span>) no cuenta con el Custom Claim de administrador en Firebase Auth.
+          Tu cuenta actual (<span className="text-[#ffb4ab] font-mono">{currentUser?.email || 'Sin sesión'}</span>) no cuenta con permisos de administrador autorizados.
         </p>
-
-        {/* Development QA Quick Role Switcher (Restringido estrictamente a modo desarrollo local, oculto en producción) */}
-        {import.meta.env.DEV && (
-          <div className="p-4 bg-[#1d1b1b] border border-[#5e3f3c] mb-6">
-            <div className="flex items-center space-x-2 text-xs font-mono text-[#ffb4ab] mb-2">
-              <KeyRound className="w-4 h-4 text-emerald-400" />
-              <span>MODO TESTING // DESARROLLO LOCAL:</span>
-            </div>
-            <p className="font-mono text-xs text-neutral-400 mb-3">
-              Para evaluar el panel administrativo en tu máquina local, puedes activar la sesión de prueba:
-            </p>
-            <button
-              onClick={() => setDemoSession('admin')}
-              className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-mono text-xs font-bold uppercase tracking-wider transition-colors"
-            >
-              ⚡ ACTIVAR SESIÓN DE ADMIN (TESTING LOCAL)
-            </button>
-          </div>
-        )}
 
         <div className="flex justify-between items-center">
           <button

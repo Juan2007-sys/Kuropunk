@@ -23,18 +23,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [redirectIntent, setRedirectIntent] = useState(null);
 
-  // Development fallback user restricted strictly to DEV environment (disabled in production)
-  const [devDemoUser, setDevDemoUser] = useState(() => {
-    if (!import.meta.env.DEV) return null;
-    try {
-      const saved = localStorage.getItem('kuropunk_demo_auth');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
   useEffect(() => {
+    try {
+      localStorage.removeItem('kuropunk_demo_auth');
+    } catch {}
+
     let unsubscribe = () => {};
 
     try {
@@ -69,32 +62,20 @@ export function AuthProvider({ children }) {
             });
           }
         } else {
-          // Strict wipeout: if user === null, purge immediately
-          if (!devDemoUser) {
-            setCurrentUser(null);
-            setUserRole('customer');
-          } else {
-            // Only keep dev demo if explicitly set in dev testing
-            setCurrentUser(devDemoUser);
-            setUserRole(devDemoUser.role || 'customer');
-          }
+          setCurrentUser(null);
+          setUserRole('customer');
         }
         setLoading(false);
       });
     } catch (e) {
-      console.warn('Firebase Auth state listener error (using dev demo user if set):', e);
-      if (devDemoUser) {
-        setCurrentUser(devDemoUser);
-        setUserRole(devDemoUser.role || 'customer');
-      } else {
-        setCurrentUser(null);
-        setUserRole('customer');
-      }
+      console.warn('Firebase Auth state listener error:', e);
+      setCurrentUser(null);
+      setUserRole('customer');
       setLoading(false);
     }
 
     return () => unsubscribe();
-  }, [devDemoUser]);
+  }, []);
 
   // Google Sign-In with robust configuration and explicit error handling
   const loginWithGoogle = async () => {
@@ -205,31 +186,14 @@ export function AuthProvider({ children }) {
     }
     localStorage.removeItem('kuropunk_demo_auth');
     sessionStorage.clear();
-    setDevDemoUser(null);
     setCurrentUser(null);
     setUserRole('customer');
-  };
-
-  // Fast Dev Mode Role Switcher (Allows testing Admin Panel and Customer views effortlessly)
-  const setDemoSession = (role = 'admin') => {
-    const demo = {
-      uid: role === 'admin' ? 'admin_kuro_master' : 'customer_santiago_qa',
-      email: role === 'admin' ? 'admin@kuropunk.co' : 'santiago.qa@kuropunk.co',
-      displayName: role === 'admin' ? 'Admin Master (Taller KuroPunk)' : 'Santiago Vélez (Cliente)',
-      phoneNumber: '+573015690382',
-      role,
-      isAdmin: role === 'admin'
-    };
-    localStorage.setItem('kuropunk_demo_auth', JSON.stringify(demo));
-    setDevDemoUser(demo);
-    setCurrentUser(demo);
-    setUserRole(role);
   };
 
   const value = {
     currentUser,
     userRole,
-    isAdmin: Boolean(currentUser && (userRole === 'admin' || currentUser?.isAdmin === true)),
+    isAdmin: Boolean(currentUser && userRole === 'admin'),
     loading,
     isFirebaseConfigured,
     redirectIntent,
@@ -237,8 +201,7 @@ export function AuthProvider({ children }) {
     loginWithGoogle,
     loginWithEmail,
     registerWithEmail,
-    logout,
-    setDemoSession
+    logout
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

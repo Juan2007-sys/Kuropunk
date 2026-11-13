@@ -141,7 +141,7 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
               <Hammer className="w-4 h-4 text-[#e0141f] shrink-0" />
               <div className="min-w-0">
                 <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider truncate">
-                  HUD MODO TALLER // VUELTAS
+                  HUD MODO TALLER · VUELTAS
                 </h3>
                 <p className="text-[10px] text-[#ffb4ab] uppercase truncate">
                   {currentPatternTitle}

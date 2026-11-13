@@ -274,11 +274,47 @@ export async function saveContactMessageInFirestore(contactData) {
   }
 }
 
+const DEFAULT_ADMIN_EMAILS = ['juanque.ovalle@gmail.com', 'admin@kuropunk.co'];
+
+function isVerifiedAdminEmail(user) {
+  if (!user || !user.email) return false;
+  if (user.emailVerified === false) return false;
+  const envEmails = (getEnvVar('ADMIN_EMAILS') || '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const allowlist = new Set([...DEFAULT_ADMIN_EMAILS, ...envEmails]);
+  return allowlist.has(String(user.email).trim().toLowerCase());
+}
+
+/**
+ * Builds authenticated headers for Admin API requests using the current Firebase ID Token
+ */
+export async function getAdminAuthHeaders() {
+  const headers = {};
+  try {
+    if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+      const idToken = await auth.currentUser.getIdToken();
+      if (idToken) {
+        headers.Authorization = `Bearer ${idToken}`;
+      }
+    }
+  } catch (e) {
+    console.warn('[KuroPunk Firebase] Error obteniendo ID token de administrador:', e?.message);
+  }
+  const envAdminKey = getEnvVar('ADMIN_KEY');
+  if (envAdminKey && envAdminKey.trim().length >= 16) {
+    headers['x-admin-key'] = envAdminKey.trim();
+  }
+  return headers;
+}
+
 /**
  * Syncs user profile in Firestore `users/{uid}` collection
  */
 export async function syncUserProfile(user, additionalData = {}) {
   if (!user || !isFirebaseConfigured) return null;
+  const autoAdmin = isVerifiedAdminEmail(user);
   try {
     const userDocRef = doc(db, 'users', user.uid);
     const snap = await getDoc(userDocRef);
@@ -289,14 +325,20 @@ export async function syncUserProfile(user, additionalData = {}) {
         email: user.email || '',
         displayName: additionalData.displayName || user.displayName || 'Operativo KuroPunk',
         phoneNumber: additionalData.phoneNumber || user.phoneNumber || '',
-        role: additionalData.role || 'customer',
+        role: autoAdmin ? 'admin' : (additionalData.role || 'customer'),
         createdAt: serverTimestamp()
       };
       await setDoc(userDocRef, newUserData);
       return newUserData;
     }
 
-    return snap.data();
+    const existing = snap.data();
+    if (autoAdmin && existing.role !== 'admin') {
+      await setDoc(userDocRef, { role: 'admin' }, { merge: true });
+      return { ...existing, role: 'admin' };
+    }
+
+    return existing;
   } catch (err) {
     console.warn('[KuroPunk Firebase] syncUserProfile warning:', err.message);
     return null;
@@ -308,6 +350,7 @@ export async function syncUserProfile(user, additionalData = {}) {
  */
 export async function getUserRole(user) {
   if (!user) return 'customer';
+  if (isVerifiedAdminEmail(user)) return 'admin';
   if (!isFirebaseConfigured) return user.role || 'customer';
 
   try {
@@ -349,9 +392,7 @@ export async function createFirestoreOrder(orderData) {
   const depositRequiredAmount =
     orderData.depositRequiredAmount !== undefined
       ? Number(orderData.depositRequiredAmount)
-      : requiresDeposit
-      ? depositBaseAmount + (Math.floor(Math.random() * 99) + 1)
-      : 0;
+      : depositBaseAmount;
   const remainingBalance =
     orderData.remainingBalance !== undefined
       ? Number(orderData.remainingBalance)
@@ -561,9 +602,16 @@ export async function deleteOrderInFirestore(orderId) {
   } catch {}
 
   if (isFirebaseConfigured) {
-    const docRef = doc(db, 'orders', String(orderId));
-    await deleteDoc(docRef);
+    try {
+      const docRef = doc(db, 'orders', String(orderId));
+      await deleteDoc(docRef);
+      return true;
+    } catch (e) {
+      console.warn('Error eliminando orden de Firestore:', orderId, e);
+      return false;
+    }
   }
+  return true;
 }
 
 /**
@@ -588,18 +636,113 @@ export async function clearAllOrdersInFirestore(orderIds = []) {
 }
 
 /**
- * Uploads product image file to Firebase Storage with progress tracking
+ * Compresses an image file in the browser into a compact JPEG data URL (~15-30KB)
+ * so voucher screenshots can always be stored and viewed by Admin even without Storage rules.
+ */
+export function compressImageToDataUrl(file, maxDim = 640, quality = 0.62) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('No se proporcionó imagen para comprimir.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo de imagen.'));
+    reader.onload = () => {
+      const rawDataUrl = String(reader.result || '');
+      const img = new Image();
+      img.onerror = () => {
+        // Si no puede decodificarse en Canvas pero es imagen pequeña, usar dataURL directo
+        if (rawDataUrl.startsWith('data:image/') && rawDataUrl.length < 55000) {
+          resolve(rawDataUrl);
+        } else {
+          reject(new Error('El archivo seleccionado no es una imagen válida.'));
+        }
+      };
+      img.onload = () => {
+        try {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width >= height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          let out = canvas.toDataURL('image/jpeg', quality);
+          if (out.length > 52000) {
+            out = canvas.toDataURL('image/jpeg', 0.45);
+          }
+          resolve(out);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Subscribes in real-time to a single order document by ID (works for both logged-in users and guests)
+ */
+export function subscribeToOrderById(orderId, onData) {
+  if (!orderId) return () => {};
+  if (!isFirebaseConfigured) {
+    try {
+      const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+      const found = local.find((o) => String(o.id) === String(orderId));
+      if (found) onData(found);
+    } catch {}
+    return () => {};
+  }
+
+  const orderRef = doc(db, 'orders', String(orderId));
+  return onSnapshot(
+    orderRef,
+    (snap) => {
+      if (snap.exists()) {
+        const data = { id: snap.id, ...snap.data() };
+        try {
+          const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
+          const idx = local.findIndex((o) => String(o.id) === String(orderId));
+          if (idx >= 0) {
+            local[idx] = { ...local[idx], ...data };
+            localStorage.setItem('kuropunk_local_orders', JSON.stringify(local));
+          }
+          const last = JSON.parse(localStorage.getItem('kuropunk_last_order') || 'null');
+          if (last && String(last.id) === String(orderId)) {
+            localStorage.setItem('kuropunk_last_order', JSON.stringify({ ...last, ...data }));
+          }
+        } catch {}
+        onData(data);
+      }
+    },
+    () => {},
+  );
+}
+
+/**
+ * Uploads product or voucher image file to Firebase Storage with automatic compressed data-URL fallback
  */
 export async function uploadProductImage(file, productId = 'prod', onProgress = null) {
   if (!file) throw new Error('No se ha proporcionado ningún archivo para subir.');
 
   if (!isFirebaseConfigured) {
-    console.info('[Firebase Storage Guard] Modo simulación local: Retornando URL de objeto temporal para previsualización.');
     if (onProgress) onProgress(100);
-    return URL.createObjectURL(file);
+    return compressImageToDataUrl(file);
   }
 
-  return new Promise((resolve, reject) => {
+  const storagePromise = new Promise((resolve, reject) => {
     try {
       const ext = file.name.split('.').pop() || 'png';
       const sanitizedId = String(productId).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -619,11 +762,6 @@ export async function uploadProductImage(file, productId = 'prod', onProgress = 
           }
         },
         (error) => {
-          console.error('[Firebase Storage Error]', {
-            code: error?.code,
-            message: error?.message,
-            error
-          });
           reject(error);
         },
         async () => {
@@ -632,16 +770,27 @@ export async function uploadProductImage(file, productId = 'prod', onProgress = 
             if (onProgress) onProgress(100);
             resolve(downloadUrl);
           } catch (urlErr) {
-            console.error('[Firebase Storage getDownloadURL Error]', urlErr);
             reject(urlErr);
           }
         }
       );
     } catch (err) {
-      console.error('[Firebase Storage Exception]', err);
       reject(err);
     }
   });
+
+  try {
+    return await Promise.race([
+      storagePromise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Storage upload timeout')), 3500),
+      ),
+    ]);
+  } catch {
+    const compressed = await compressImageToDataUrl(file);
+    if (onProgress) onProgress(100);
+    return compressed;
+  }
 }
 
 /**

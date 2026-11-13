@@ -100,7 +100,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
   const handleDownload = () => {
     try {
       downloadPatternPDF(product);
-      showToast(`DESCARGANDO PATRÓN DIGITAL // ${product.title.toUpperCase()}`, "success");
+      showToast(`DESCARGANDO PATRÓN DIGITAL · ${product.title.toUpperCase()}`, "success");
     } catch (err) {
       showToast("ERROR AL GENERAR EL DOCUMENTO PDF", "error");
     }
@@ -209,7 +209,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
                     ? 'bg-amber-600 text-white font-bold'
                     : 'bg-neutral-900 text-neutral-200 border border-neutral-700'
                 }`}>
-                  {product.badge} {product.badgeVol ? `// ${product.badgeVol}` : ''}
+                  {product.badge} {product.badgeVol ? `· ${product.badgeVol}` : ''}
                 </span>
               )}
             </div>
@@ -311,7 +311,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
           {/* Badge Informativo: Coleccionable Artesanal */}
           <div className="flex items-center justify-between p-3 bg-[#121010] border border-neutral-800 text-xs font-mono shadow-md">
             <span className="text-[#ffb4ab] font-bold uppercase flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#e0141f]" /> ARTEFACTO ARTESANAL // EDICIÓN FÍSICA
+              <Sparkles className="w-3.5 h-3.5 text-[#e0141f]" /> ARTEFACTO ARTESANAL · EDICIÓN FÍSICA
             </span>
             <span className="text-neutral-300 text-[11px] font-bold bg-neutral-900 px-2.5 py-1 border border-neutral-700">
               COLECCIONABLE TERMINADO
@@ -495,7 +495,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
             <div className="flex items-center gap-3">
               <ShieldCheck className="w-5 h-5 text-[#FF0033] shrink-0 group-hover:scale-110 transition-transform" />
               <span className="text-left font-bold text-neutral-200 group-hover:text-white">
-                CERTIFICADO DE AUTENTICIDAD // VERIFICAR EN BÓVEDA
+                CERTIFICADO DE AUTENTICIDAD · VERIFICAR EN BÓVEDA
               </span>
             </div>
             <span className="text-[10px] text-[#ffb4ab] border border-[#5e3f3c] px-2 py-0.5">

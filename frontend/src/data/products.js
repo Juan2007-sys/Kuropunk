@@ -1,7 +1,7 @@
 export const PRODUCTS = [
 {
     "id": "jungkook-cooky-plataforma",
-    "sku": "JK-01 // FLAGSHIP",
+    "sku": "JK-01 · FLAGSHIP",
     "title": "Jungkook con Pijama de Cooky (14cm Plataforma)",
     "subtitle": "Figura de Colección Idol con Orejas Cooky sobre Plataforma",
     "category": "Rogues",
@@ -38,7 +38,7 @@ export const PRODUCTS = [
   },
   {
     "id": "dulce-princesa-plataforma",
-    "sku": "AT-01 // ROGUES",
+    "sku": "AT-01 · ROGUES",
     "title": "Dulce Princesa de Hora de Aventura",
     "subtitle": "Figura Amigurumi Coleccionable sobre Plataforma (15cm)",
     "category": "Rogues",
@@ -73,8 +73,8 @@ export const PRODUCTS = [
   },
   {
     "id": "jungkook-cooky-pequeno",
-    "sku": "JK-02 // ALLEY KAT",
-    "title": "Jungkook con Pijama de Cooky (Sin Plataforma // 6.5cm)",
+    "sku": "JK-02 · ALLEY KAT",
+    "title": "Jungkook con Pijama de Cooky (Sin Plataforma · 6.5cm)",
     "subtitle": "Figura Amigurumi Sin Plataforma - Portable de Bolsillo (6.5cm)",
     "category": "Alley Kats",
     "series": "Idol Series",
@@ -112,7 +112,7 @@ export const PRODUCTS = [
   {
     isActive: false,
     id: "the-wanderer",
-    sku: "RX-00 // FLAGSHIP",
+    sku: "RX-00 · FLAGSHIP",
     title: "The Wanderer",
     subtitle: "Pieza de Colección Artesanal con Báculo",
     category: "Rogues",
@@ -224,7 +224,7 @@ export const PRODUCTS = [
     description: "Un felino sombrío con textura táctil pesada y trazos de aerosol amarillo neón. Acabado desgastado con puntada de crochet extra densa.",
     specs: [
       "HILO: ACRÍLICO DE ALTA DENSIDAD",
-      "ESTADO: ARCHIVADO // TIRADA RETIRADA",
+      "ESTADO: ARCHIVADO · TIRADA RETIRADA",
       "ALTURA: 6.5 PULGADAS (16.5 CM)"
     ],
     image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCTaIYMXtPfGCDjTPKdxCia3nIg-m-ATdeSnmdYuR46zBCYB8Bj-cRWKmmVTZGc8Rcf0IvfPv2sjEt7Q3IcVAVogv4wPMrTYe2YKatLy6OpIxR8DgWlhMyJUdXZzJ4kHjbcfUgC_4vvyOCB0SjiMpdm7R_q_GFRe2YEfd1KEQxh7bm7NzPwgUxza4XPfV26WLXsiUhCozmvxd_-DEoO-kgsZPmFq4UNQUkFsNHharvLfJt1res_elBN",
@@ -505,7 +505,7 @@ export const PUNTO_CRUZ_PRODUCTS = [
   {
     isActive: false,
     id: "punto-cruz-kuropunk-cat",
-    sku: "PC-01 // SIGNATURE",
+    sku: "PC-01 · SIGNATURE",
     title: "KuroPunk Cat & Electric Bass",
     subtitle: "Gráfico Punto Cruz Oficial KuroPunk",
     category: "Punto Cruz",
@@ -536,7 +536,7 @@ export const PUNTO_CRUZ_PRODUCTS = [
   {
     isActive: false,
     id: "punto-cruz-graffiti-skull",
-    sku: "PC-02 // SKULL SERIES",
+    sku: "PC-02 · SKULL SERIES",
     title: "Graffiti Skull & Needles",
     subtitle: "Calavera Urbana con Agujas Cruzadas",
     category: "Punto Cruz",
@@ -566,7 +566,7 @@ export const PUNTO_CRUZ_PRODUCTS = [
   {
     isActive: false,
     id: "punto-cruz-vandal-spray",
-    sku: "PC-03 // STREET GEAR",
+    sku: "PC-03 · STREET GEAR",
     title: "Vandal Aerosol Can",
     subtitle: "Lata de Graffiti Gachiakuta en Pixel Art",
     category: "Punto Cruz",
@@ -596,7 +596,7 @@ export const PUNTO_CRUZ_PRODUCTS = [
   {
     isActive: false,
     id: "punto-cruz-cyber-mecha",
-    sku: "PC-04 // TECHNO",
+    sku: "PC-04 · TECHNO",
     title: "Mecha Cyberpunk Skull",
     subtitle: "Diseño Cibernético en Punto de Cruz",
     category: "Punto Cruz",
@@ -629,7 +629,7 @@ export const PATRONES_PRODUCTS = [
   {
     isActive: false,
     id: "patron-the-wanderer",
-    sku: "PT-01 // MASTER BLUEPRINT",
+    sku: "PT-01 · MASTER BLUEPRINT",
     title: "Patrón: The Wanderer Amigurumi",
     subtitle: "Guía Maestra Paso a Paso con Fotos HD",
     category: "Patrones",
@@ -645,7 +645,7 @@ export const PATRONES_PRODUCTS = [
     yarn: "240m Lana Acrílica Alta Torsión Carbón + Naranja",
     height: "8.5 Pulgadas",
     pages: "38 Páginas con 110 Fotografías",
-    difficulty: "Experto // Brutal",
+    difficulty: "Experto · Brutal",
     stitches: "AM, PB, MPA, PA, AUM, DISM, BLO",
     estimatedTime: "12-14 Horas",
     description: "El patrón oficial completo para recrear a The Wanderer. Incluye plantilla para ensamblado del báculo con cristal, mochila táctica miniatura y técnicas de articulación interna.",
@@ -661,7 +661,7 @@ export const PATRONES_PRODUCTS = [
   {
     isActive: false,
     id: "patron-vandal-bear",
-    sku: "PT-02 // ALLEY SERIES",
+    sku: "PT-02 · ALLEY SERIES",
     title: "Patrón: Vandal Bear",
     subtitle: "Guía de Tejido Oso Punk con Mini Aerosol",
     category: "Patrones",
@@ -692,7 +692,7 @@ export const PATRONES_PRODUCTS = [
   {
     isActive: false,
     id: "patron-scrap-bunny",
-    sku: "PT-03 // ALLEY SERIES",
+    sku: "PT-03 · ALLEY SERIES",
     title: "Patrón: Scrap Bunny",
     subtitle: "Guía de Tejido Conejo Postapocalíptico",
     category: "Patrones",
@@ -722,7 +722,7 @@ export const PATRONES_PRODUCTS = [
   {
     isActive: false,
     id: "patron-rat-king-edc",
-    sku: "PT-04 // HARDWARE",
+    sku: "PT-04 · HARDWARE",
     title: "Patrón: Rat King EDC Mascot",
     subtitle: "Mini Rata de Bolsillo con Gorro Rojo",
     category: "Patrones",
@@ -738,7 +738,7 @@ export const PATRONES_PRODUCTS = [
     yarn: "70m Acrílico Asfalto + Rojo",
     height: "4.5 Pulgadas",
     pages: "16 Páginas con Diagrama",
-    difficulty: "Principiante // Rápido",
+    difficulty: "Principiante · Rápido",
     stitches: "AM, PB, AUM, DISM",
     estimatedTime: "3-4 Horas",
     description: "Proyecto rápido y adictivo para tejer en una tarde. Perfecto para llaveros y regalos urbanos con alfiler de gancho auténtico.",

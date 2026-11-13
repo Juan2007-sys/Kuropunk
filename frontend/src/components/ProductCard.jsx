@@ -78,7 +78,7 @@ export const ProductCard = ({ product, onSelectProduct, delayIndex = 0 }) => {
                     : 'bg-neutral-900/90 text-neutral-200 border border-neutral-700'
                 }`}>
                   {(product.badge === 'HOT' || product.badge === 'DESTACADO') && <Flame className="w-2.5 h-2.5" />}
-                  {product.badge} {product.badgeVol ? `// ${product.badgeVol}` : ''}
+                  {product.badge} {product.badgeVol ? `· ${product.badgeVol}` : ''}
                 </span>
               )}
 

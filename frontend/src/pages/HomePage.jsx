@@ -38,7 +38,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
           >
             {/* Tape Tag */}
             <div className="tape-overlay !top-[-28px] !left-0">
-              SERIES 01 // DROP TÁCTICO
+              SERIES 01 · DROP TÁCTICO
             </div>
 
             <h1 className="font-headline-xl text-6xl sm:text-7xl lg:text-[88px] text-[#e6e1e1] uppercase tracking-wider break-words leading-[0.85] mb-4 drop-shadow-2xl">
@@ -205,7 +205,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
           <div className="flex flex-col items-center justify-center text-center mb-14 relative z-10">
             <div className="spray-stroke-white top-0 left-1/2 -translate-x-1/2 w-96 h-20 transform -rotate-2 pointer-events-none opacity-40"></div>
             <span className="font-label-caps text-xs text-[#e0141f] uppercase tracking-widest font-bold mb-1">
-              EDICIÓN LIMITADA // LOTE 01
+              EDICIÓN LIMITADA · LOTE 01
             </span>
             <h2 className="font-headline-lg text-4xl sm:text-5xl text-[#e6e1e1] uppercase tracking-tight mb-2 relative z-10">
               Últimos Lanzamientos

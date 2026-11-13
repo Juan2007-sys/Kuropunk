@@ -17,40 +17,40 @@ import {
 const CERTIFICATE_VAULT = {
   'RX-00-042': {
     serial: 'RX-00-042',
-    sku: 'RX-00 // FLAGSHIP',
+    sku: 'RX-00 · FLAGSHIP',
     title: 'The Wanderer - Edición Coleccionista',
     series: 'Grit Series Vol. 04',
     edition: '042 de 050',
     craftDate: '15 de Agosto, 2026',
     artisan: 'Mateo R. & Colectivo KuroPunk Bogotá',
     yarnSpec: 'Acrílico Industrial de Alta Torsión 100%',
-    status: 'VERIFICADO // ACTIVO EN BÓVEDA',
+    status: 'VERIFICADO · ACTIVO EN BÓVEDA',
     ownerAlias: 'Operativo Coleccionista #42',
     notes: 'Pieza equipada con mini brújula funcional y báculo de resina cristalina. Tensión de puntada ultra-cerrada.'
   },
   'RX-01-088': {
     serial: 'RX-01-088',
-    sku: 'RX-01 // ALLEY KAT',
+    sku: 'RX-01 · ALLEY KAT',
     title: 'Vandal Bear - Street Punk',
     series: 'Alley Kats Drop 01',
     edition: '088 de 100',
     craftDate: '28 de Agosto, 2026',
     artisan: 'Valentina C. (Taller Central)',
     yarnSpec: 'Hilado de Fibra de Carbono & Poliéster Reforzado',
-    status: 'VERIFICADO // ACTIVO EN BÓVEDA',
+    status: 'VERIFICADO · ACTIVO EN BÓVEDA',
     ownerAlias: 'Operativo Urbano #88',
     notes: 'Incluye lata miniatura de spray stencil roja y desgaste artesanal en orejas.'
   },
   'RX-02-015': {
     serial: 'RX-02-015',
-    sku: 'RX-02 // SKULL',
+    sku: 'RX-02 · SKULL',
     title: 'Scrap Bunny - Edición Distópica',
     series: 'Distopía Vol. 02',
     edition: '015 de 030',
     craftDate: '02 de Septiembre, 2026',
     artisan: 'Santiago V. (Laboratorio Táctico)',
     yarnSpec: 'Lana de Algodón Peinado y Retales Reciclados',
-    status: 'VERIFICADO // ACTIVO EN BÓVEDA',
+    status: 'VERIFICADO · ACTIVO EN BÓVEDA',
     ownerAlias: 'Coleccionista Privado #15',
     notes: 'Remiendos con hilo fluor luminiscente visible bajo luz UV.'
   }
@@ -76,14 +76,14 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
       if (clean.startsWith('RX-') || clean.startsWith('KP-')) {
         setSearchResult({
           serial: clean,
-          sku: `${clean} // EDICIÓN TALLER`,
+          sku: `${clean} · EDICIÓN TALLER`,
           title: 'Pieza Artesanal Confeccionada por Pedido',
           series: 'Lote Personalizado KuroPunk',
           edition: 'Pieza Única 1 de 1',
           craftDate: 'Septiembre 2026',
           artisan: 'Artesano Certificado KuroPunk Bogotá',
           yarnSpec: 'Fibras Seleccionadas de Grado Industrial',
-          status: 'VERIFICADO // PIEZA AUTÉNTICA',
+          status: 'VERIFICADO · PIEZA AUTÉNTICA',
           ownerAlias: 'Comprador Certificado',
           notes: 'Certificado de autenticidad generado por el taller de confección contra entrega.'
         });
@@ -96,7 +96,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
 
   const handleCopy = () => {
     if (searchResult && navigator.clipboard) {
-      navigator.clipboard.writeText(`CERTIFICADO KUROPUNK // SERIAL: ${searchResult.serial} - PIEZA: ${searchResult.title}`);
+      navigator.clipboard.writeText(`CERTIFICADO KUROPUNK · SERIAL: ${searchResult.serial} - PIEZA: ${searchResult.title}`);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2500);
     }
@@ -117,7 +117,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
               <ShieldCheck className="w-5 h-5 text-[#e0141f] shrink-0" />
               <div>
                 <h3 className="font-headline-md text-base sm:text-lg text-white uppercase tracking-wider">
-                  VERIFICADOR DE AUTENTICIDAD // BÓVEDA
+                  VERIFICADOR DE AUTENTICIDAD · BÓVEDA
                 </h3>
                 <p className="text-[10px] sm:text-[11px] font-mono text-[#ffb4ab]">
                   CERTIFICADO OFICIAL DE PIEZAS FÍSICAS Y EDICIONES
@@ -193,7 +193,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
                       {searchResult.title}
                     </h4>
                     <p className="text-xs font-mono text-[#ffb4ab]">
-                      {searchResult.series} // {searchResult.sku}
+                      {searchResult.series} · {searchResult.sku}
                     </p>
                   </div>
 
@@ -236,7 +236,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
                 <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[10px] font-mono text-neutral-500">
                     <Award className="w-4 h-4 text-[#e0141f]" />
-                    <span>EMITIDO POR KUROPUNK COLLECTIVE // BOGOTÁ</span>
+                    <span>EMITIDO POR KUROPUNK COLLECTIVE · BOGOTÁ</span>
                   </div>
 
                   <button

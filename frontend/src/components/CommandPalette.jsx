@@ -104,7 +104,7 @@ export const CommandPalette = ({ isOpen, setIsOpen, onSelectProduct, setCurrentV
           <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 bg-[#121212] text-[10px] font-mono text-neutral-400">
             <span className="flex items-center gap-1.5 text-[#FF0033] font-bold">
               <span className="w-2 h-2 rounded-full bg-[#FF0033] animate-pulse"></span>
-              KUROPUNK // TERMINAL BÓVEDA
+              KUROPUNK · TERMINAL BÓVEDA
             </span>
             <div className="flex items-center gap-1">
               <span className="text-neutral-500 hidden sm:inline text-[10px] mr-2">ESC PARA SALIR</span>

@@ -70,7 +70,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b-2 border-[#5e3f3c] pb-6 mb-8 gap-4">
         <div>
           <div className="text-xs font-mono text-[#ffb4ab] tracking-widest uppercase mb-1">
-            PORTAL DEL CLIENTE // MI CUENTA
+            PORTAL DEL CLIENTE · MI CUENTA
           </div>
           <h1 className="font-headline-lg text-3xl sm:text-4xl text-[#fff4f3] uppercase tracking-wider">
             MIS PEDIDOS Y SEGUIMIENTO EN VIVO
@@ -158,6 +158,49 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                   </div>
                 </div>
 
+                {/* Aviso Destacado del Estado del Anticipo */}
+                {!isCancelled && order.paymentStatus === 'ANTICIPO_VERIFICADO' && (
+                  <div className="mb-6 p-4 bg-emerald-950/40 border-2 border-[#25D366] flex items-start gap-3 font-mono text-xs text-emerald-200">
+                    <CheckCircle className="w-5 h-5 text-[#25D366] shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-[#25D366] uppercase block text-sm">
+                        ¡Pago Aceptado! Tu pedido ya está en la Cola Oficial de Producción
+                      </strong>
+                      <span>
+                        Confirmamos la recepción de tu anticipo del 20%. El 80% restante lo pagas únicamente al recibir tu pedido en mano.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {!isCancelled && String(order.status || '').toUpperCase() === 'VERIFICANDO_ANTICIPO' && (
+                  <div className="mb-6 p-4 bg-amber-950/30 border border-amber-500/60 flex items-start gap-3 font-mono text-xs text-amber-200">
+                    <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-amber-300 uppercase block">
+                        Verificando tu Comprobante de Anticipo
+                      </strong>
+                      <span>
+                        Recibimos tu soporte{order.paymentReference ? ` (#${order.paymentReference})` : ''}. En cuanto el administrador confirme el pago, verás aquí mismo el aviso de aceptación en tiempo real.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {!isCancelled && order.paymentStatus === 'RECHAZADO' && (
+                  <div className="mb-6 p-4 bg-red-950/40 border border-red-500/70 flex items-start gap-3 font-mono text-xs text-red-200">
+                    <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-red-300 uppercase block">
+                        Comprobante no validado — Acción requerida
+                      </strong>
+                      <span>
+                        No pudimos confirmar el soporte enviado. Verifica tu transferencia y vuelve a adjuntar la foto del comprobante desde el rastreador de pedidos.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Multi-step Visual Stepper */}
                 {!isCancelled ? (
                   <div className="mb-8">
@@ -241,7 +284,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                         {order.customerData?.shippingAddress || order.address}
                       </p>
                       <p className="text-[#ffb4ab] mt-2">
-                        🛵 Entrega en mano directa por el artesano (+57 301 569 0382)
+                        🛵 Entrega en mano directa por el artesano (+57 323 8937221)
                       </p>
                     </div>
                   </div>

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { trackOrder, reportOrderPayment } from '../services/api';
-import { reportOrderPaymentInFirestore } from '../services/firebase';
+import {
+  reportOrderPaymentInFirestore,
+  compressImageToDataUrl,
+  subscribeToOrderById,
+} from '../services/firebase';
 import { PAYMENT_ACCOUNTS } from '../config/paymentConfig';
 import { formatCOP, WHATSAPP_PHONE, WHATSAPP_PHONE_DISPLAY, generateWhatsAppTrackingUrl } from '../utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,7 +24,8 @@ import {
   Copy,
   ShieldCheck,
   Loader2,
-  Banknote
+  Banknote,
+  Upload
 } from 'lucide-react';
 
 const TIMELINE_STEPS = [
@@ -62,7 +67,27 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [paymentReference, setPaymentReference] = useState('');
+  const [proofFile, setProofFile] = useState(null);
   const [isReporting, setIsReporting] = useState(false);
+
+  // Suscripción en tiempo real a la orden consultada para reflejar cambios del Admin al instante
+  useEffect(() => {
+    if (!isOpen || !order?.id) return;
+    const unsub = subscribeToOrderById(order.id, (liveOrder) => {
+      if (!liveOrder) return;
+      setOrder((prev) => {
+        if (
+          prev &&
+          prev.paymentStatus !== 'ANTICIPO_VERIFICADO' &&
+          liveOrder.paymentStatus === 'ANTICIPO_VERIFICADO'
+        ) {
+          toast.success(`¡Pago aceptado! Tu orden #${liveOrder.id} ya está en la Cola Oficial de Producción.`);
+        }
+        return { ...prev, ...liveOrder };
+      });
+    });
+    return () => unsub();
+  }, [isOpen, order?.id]);
 
   // Auto-search last order from localStorage if available
   useEffect(() => {
@@ -111,20 +136,34 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
       toast.warning('Ingresa un número de comprobante válido (mínimo 4 caracteres).');
       return;
     }
+    if (!proofFile) {
+      toast.warning('Debes adjuntar obligatoriamente la foto o captura del comprobante.');
+      return;
+    }
 
     setIsReporting(true);
     try {
-      const updated = await reportOrderPayment(order.id, { paymentReference: cleanRef });
-      await reportOrderPaymentInFirestore(order.id, { paymentReference: cleanRef });
+      const uploadedProofUrl = await compressImageToDataUrl(proofFile);
+
+      const updated = await reportOrderPayment(order.id, {
+        paymentReference: cleanRef,
+        paymentProofUrl: uploadedProofUrl,
+      });
+      await reportOrderPaymentInFirestore(order.id, {
+        paymentReference: cleanRef,
+        paymentProofUrl: uploadedProofUrl,
+      });
       setOrder((prev) => ({
         ...prev,
         ...updated,
         paymentReference: cleanRef,
+        paymentProofUrl: uploadedProofUrl,
         paymentStatus: 'VERIFICANDO_ANTICIPO',
         status: 'VERIFICANDO_ANTICIPO',
       }));
       setPaymentReference('');
-      toast.success('¡Comprobante registrado! Verificando ingreso en cuenta.');
+      setProofFile(null);
+      toast.success('¡Comprobante y foto registrados! Verificando ingreso en cuenta.');
     } catch (err) {
       toast.error(err.message || 'Error al registrar comprobante.');
     } finally {
@@ -266,46 +305,47 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                   </div>
 
                   <p className="text-neutral-300 leading-relaxed">
-                    Para ingresar tu pedido a la cola oficial de producción, transfiere el monto exacto con identificador único y sube tu número de comprobante:
+                    Para ingresar tu pedido a la cola oficial de producción, transfiere el anticipo del 20% a nuestra llave oficial y adjunta la referencia junto con la foto del comprobante:
                   </p>
 
                   <div className="p-3 bg-[#1d1b1b] border border-[#25D366] flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] text-[#25D366] uppercase block">Monto Exacto a Transferir (20% + ID):</span>
+                      <span className="text-[10px] text-[#25D366] uppercase block">Valor del Anticipo (20%):</span>
                       <strong className="text-2xl text-white font-headline-md">{formatCOP(depositAmount)}</strong>
                     </div>
                     <button
                       type="button"
-                      onClick={() => copyValue(depositAmount, 'Monto exacto copiado')}
+                      onClick={() => copyValue(depositAmount, 'Monto del anticipo copiado')}
                       className="px-3 py-2 bg-[#25D366] text-black font-bold uppercase text-[11px] flex items-center gap-1"
                     >
                       <Copy className="w-3.5 h-3.5" /> Copiar Valor
                     </button>
                   </div>
 
-                  {/* Llaves para pagar */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {/* Llave oficial para pagar */}
+                  <div className={`grid gap-2 ${PAYMENT_ACCOUNTS.length === 1 ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3'}`}>
                     {PAYMENT_ACCOUNTS.map((acc) => (
-                      <div key={acc.id} className="p-2.5 bg-[#1d1b1b] border border-[#5e3f3c] flex flex-col justify-between gap-2">
+                      <div key={acc.id} className="p-3 bg-[#1d1b1b] border border-[#5e3f3c] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div>
                           <span className="text-[10px] text-[#ffb4ab] font-bold block">{acc.label}</span>
-                          <strong className="text-sm text-[#25D366] block">{acc.key}</strong>
+                          <strong className="text-base text-[#25D366] tracking-wider block">{acc.key}</strong>
+                          <span className="text-[10px] text-neutral-400 block">{acc.bank}</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => copyValue(acc.key, `Llave ${acc.label} copiada`)}
-                          className="w-full py-1 bg-[#262424] hover:bg-[#333030] text-white border border-neutral-600 text-[10px] uppercase font-bold flex items-center justify-center gap-1"
+                          className="px-3 py-2 bg-[#262424] hover:bg-[#333030] text-white border border-neutral-600 text-[10px] uppercase font-bold flex items-center justify-center gap-1.5 shrink-0"
                         >
-                          <Copy className="w-3 h-3" /> Copiar Llave
+                          <Copy className="w-3.5 h-3.5" /> Copiar Llave
                         </button>
                       </div>
                     ))}
                   </div>
 
-                  {/* Formulario para subir referencia */}
-                  <form onSubmit={handleReportRefInTracking} className="space-y-2 pt-2 border-t border-[#2b2929]">
+                  {/* Formulario para subir referencia + foto obligatoria */}
+                  <form onSubmit={handleReportRefInTracking} className="space-y-2.5 pt-2 border-t border-[#2b2929]">
                     <label className="text-[11px] text-[#ffb4ab] font-bold uppercase block">
-                      ¿Ya transferiste? Ingresa el Número de Comprobante / Referencia:
+                      ¿Ya transferiste? Ingresa el Número de Comprobante y adjunta la Foto *:
                     </label>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input
@@ -316,6 +356,20 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                         placeholder="Ej: M12948392"
                         className="flex-1 bg-[#0d0c0c] border border-[#5e3f3c] px-3 py-2.5 text-white uppercase outline-none focus:border-[#25D366]"
                       />
+                      <label className="cursor-pointer px-3 py-2.5 bg-[#1d1b1b] hover:bg-[#262424] border border-[#5e3f3c] text-white uppercase text-[11px] font-bold flex items-center justify-center gap-1.5 shrink-0">
+                        <Upload className="w-3.5 h-3.5 text-[#ffb4ab]" />
+                        <span>{proofFile ? '✓ Foto Lista' : 'Subir Foto *'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          required
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) setProofFile(f);
+                          }}
+                        />
+                      </label>
                       <button
                         type="submit"
                         disabled={isReporting}
@@ -349,7 +403,7 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                       <CheckCircle2 className="w-4 h-4" />
                       <span>
                         {requiresDeposit
-                          ? '✓ ANTICIPO DEL 20% VERIFICADO // EN COLA OFICIAL'
+                          ? '✓ ANTICIPO DEL 20% VERIFICADO · EN COLA OFICIAL'
                           : '✓ PEDIDO EN COLA OFICIAL DE PRODUCCIÓN'}
                       </span>
                     </span>

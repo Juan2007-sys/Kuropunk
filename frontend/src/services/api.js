@@ -1,4 +1,5 @@
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
+import { getAdminAuthHeaders } from './firebase';
 
 const isLocalHost =
   typeof window !== 'undefined' &&
@@ -105,7 +106,7 @@ export async function getProductById(id) {
 export async function submitOrder(orderData) {
   const targetUrl = `${API_BASE_URL}/orders`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
 
   try {
     const res = await fetch(targetUrl, {
@@ -148,9 +149,15 @@ export async function submitOrder(orderData) {
     return result;
   } catch (err) {
     clearTimeout(timeoutId);
-    // Si es un error con status HTTP explícito del servidor (400, 409, 422), propagarlo directamente
-    if (err.status && err.status < 500) {
+    // Si es un error con status HTTP explícito del servidor (400, 409, 422, 500), propagarlo directamente
+    if (err.status) {
       throw err;
+    }
+    // En producción, si el usuario tiene internet pero el servidor rechazó o agotó el tiempo, no simular éxito silencioso
+    if (import.meta.env.PROD && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
+      throw new Error(
+        'No pudimos conectar con el servidor de pedidos en este momento. Por favor intenta de nuevo en unos segundos.',
+      );
     }
     // Si la API está inalcanzable, calcular de forma determinista la regla de los $50.000 COP (>= 50k pide 20%)
     const officialSubtotal = (orderData.items || []).reduce((acc, it) => {
@@ -161,16 +168,31 @@ export async function submitOrder(orderData) {
     const total = officialSubtotal;
     const requiresDeposit = total >= 50000;
     const depositBaseAmount = requiresDeposit ? Math.ceil(total * 0.20) : 0;
-    const randomPesos = requiresDeposit ? Math.floor(Math.random() * 99) + 1 : 0;
-    const depositRequiredAmount = requiresDeposit ? depositBaseAmount + randomPesos : 0;
+    const depositRequiredAmount = depositBaseAmount;
     const remainingBalance = total - depositBaseAmount;
+    const cleanPhone = String(orderData.phone || '').replace(/\D/g, '').replace(/^57(?=\d{10}$)/, '');
+    if (cleanPhone.length !== 10) {
+      throw new Error('El número de celular debe tener exactamente 10 dígitos.');
+    }
+    const cleanRef = orderData.paymentReference ? String(orderData.paymentReference).trim().toUpperCase() : null;
+    const cleanProof = orderData.paymentProofUrl ? String(orderData.paymentProofUrl).trim() : '';
+
+    if (requiresDeposit) {
+      if (!cleanRef || cleanRef.length < 4) {
+        throw new Error('Debes ingresar el número de comprobante o referencia (mínimo 4 caracteres).');
+      }
+      if (!cleanProof || cleanProof.startsWith('blob:')) {
+        throw new Error('Debes adjuntar obligatoriamente la foto del comprobante para agendar el pedido.');
+      }
+    }
+    const hasReportedRef = requiresDeposit && cleanRef && cleanRef.length >= 4;
 
     const offlineId = `VS-${Math.floor(100000 + Math.random() * 900000)}`;
     const offlineResult = {
       id: offlineId,
       customerName: orderData.customerName,
       email: orderData.email,
-      phone: orderData.phone,
+      phone: cleanPhone,
       address: orderData.address,
       city: orderData.city,
       subtotal: officialSubtotal,
@@ -180,8 +202,11 @@ export async function submitOrder(orderData) {
       depositBaseAmount,
       depositRequiredAmount,
       remainingBalance,
-      paymentStatus: requiresDeposit ? 'PENDIENTE_ANTICIPO' : 'NO_REQUIERE',
-      status: requiresDeposit ? 'ESPERANDO_PAGO' : 'EN_COLA',
+      paymentStatus: !requiresDeposit ? 'NO_REQUIERE' : 'VERIFICANDO_ANTICIPO',
+      paymentReference: cleanRef,
+      paymentProofUrl: cleanProof || null,
+      paymentReportedAt: hasReportedRef ? new Date().toISOString() : null,
+      status: !requiresDeposit ? 'EN_COLA' : 'VERIFICANDO_ANTICIPO',
       queuedAt: requiresDeposit ? null : new Date().toISOString(),
       trackingCode: `KURO-TRK-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
       items: orderData.items,
@@ -204,6 +229,10 @@ export async function reportOrderPayment(orderId, { paymentReference, paymentPro
   const cleanRef = String(paymentReference || '').trim().toUpperCase();
   if (!cleanRef || cleanRef.length < 4) {
     throw new Error('Debes ingresar un número de comprobante o referencia válido (mínimo 4 caracteres).');
+  }
+  const cleanProof = String(paymentProofUrl || '').trim();
+  if (!cleanProof || cleanProof.startsWith('blob:')) {
+    throw new Error('Debes adjuntar obligatoriamente la foto o captura del comprobante de pago.');
   }
 
   // Validación rápida local de unicidad (Candado Anti-Fraude)
@@ -257,13 +286,13 @@ export async function reportOrderPayment(orderId, { paymentReference, paymentPro
  */
 export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
   const act = String(action || '').toUpperCase();
-  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
+  const authHeaders = await getAdminAuthHeaders();
   try {
     const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/verify-deposit`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': adminKey,
+        ...authHeaders,
       },
       body: JSON.stringify({ action: act, notes }),
     });
@@ -291,15 +320,38 @@ export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
 }
 
 /**
+ * Admin sincroniza el cambio de estado de una orden con el backend
+ */
+export async function updateOrderStatusApi(orderId, status) {
+  const authHeaders = await getAdminAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({ status: String(status || '').toUpperCase() }),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody?.error?.message || errBody?.message || `Error HTTP ${res.status}`);
+  }
+  const json = await res.json().catch(() => ({}));
+  const updated = json.data !== undefined ? json.data : json;
+  syncOrderToLocalCache(updated);
+  return updated;
+}
+
+/**
  * Obtiene todas las órdenes desde el backend (Admin) o caché local
  */
 export async function getAllOrders() {
-  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
+  const authHeaders = await getAdminAuthHeaders();
   const result = await fetchWithFallback(
     `/orders?limit=100`,
     {
       method: 'GET',
-      headers: { 'x-admin-key': adminKey },
+      headers: authHeaders,
     },
     () => {
       try {
@@ -313,27 +365,79 @@ export async function getAllOrders() {
 }
 
 export async function deleteOrderApi(orderId) {
-  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
-  try {
-    await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
-      method: 'DELETE',
-      headers: { 'x-admin-key': adminKey },
-    });
-  } catch (e) {
-    console.warn('[API deleteOrder error]', e);
+  const authHeaders = await getAdminAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+    method: 'DELETE',
+    headers: authHeaders,
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.message || `Error HTTP ${response.status} al eliminar orden`);
   }
+  return response.json().catch(() => ({ success: true, id: orderId }));
 }
 
 export async function clearAllOrdersApi() {
-  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
-  try {
-    await fetch(`${API_BASE_URL}/orders`, {
-      method: 'DELETE',
-      headers: { 'x-admin-key': adminKey },
-    });
-  } catch (e) {
-    console.warn('[API clearAllOrders error]', e);
+  const authHeaders = await getAdminAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/orders`, {
+    method: 'DELETE',
+    headers: authHeaders,
+  });
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => ({}));
+    throw new Error(errBody.message || `Error HTTP ${response.status} al vaciar órdenes`);
   }
+  return response.json().catch(() => ({ success: true }));
+}
+
+export async function syncProductToBackendApi(productData) {
+  if (!productData || !productData.id) return null;
+  const authHeaders = await getAdminAuthHeaders();
+  const updatePayload = {
+    title: productData.title,
+    type: productData.technique || productData.type || 'amigurumi',
+    price: Number(productData.price) || 0,
+    stock: Number(productData.stock) || 0,
+    description: productData.description || '',
+    image: productData.imageUrl || productData.image || '',
+  };
+
+  try {
+    const patchRes = await fetch(`${API_BASE_URL}/products/${encodeURIComponent(productData.id)}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify(updatePayload),
+    });
+
+    if (patchRes.ok) {
+      return await patchRes.json().catch(() => null);
+    }
+
+    if (patchRes.status === 404) {
+      const createRes = await fetch(`${API_BASE_URL}/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({
+          ...updatePayload,
+          id: productData.id,
+          sku: String(productData.sku || productData.slug || productData.id).toUpperCase(),
+          category: productData.category || 'Amigurumis',
+        }),
+      });
+      if (createRes.ok) {
+        return await createRes.json().catch(() => null);
+      }
+    }
+  } catch (e) {
+    console.warn('[API syncProductToBackend warning]', e);
+  }
+  return null;
 }
 
 function syncOrderToLocalCache(updatedOrder) {
@@ -378,7 +482,11 @@ function updateLocalOrderFields(orderId, fields) {
  * Order Tracking Service
  */
 export async function trackOrder(query) {
-  const clean = query.trim();
+  const clean = (query || '').trim();
+  if (!clean || clean.length < 4) {
+    throw new Error('Ingresa un código de orden (#VS-...) o código de rastreo (KURO-TRK-...) válido.');
+  }
+
   return fetchWithFallback(
     `/orders/track/${encodeURIComponent(clean)}`,
     { method: 'GET' },
@@ -397,39 +505,15 @@ export async function trackOrder(query) {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (
-            parsed.id?.toLowerCase().includes(clean.toLowerCase()) ||
-            parsed.trackingCode?.toLowerCase().includes(clean.toLowerCase()) ||
-            parsed.phone?.includes(clean)
+            parsed.id?.toLowerCase() === clean.toLowerCase() ||
+            parsed.trackingCode?.toLowerCase() === clean.toLowerCase()
           ) {
             return parsed;
           }
         }
       } catch (e) {}
 
-      // Fallback demo for quick test
-      return {
-        id: clean.startsWith('VS-') ? clean : 'VS-592812',
-        trackingCode: clean.startsWith('KP-') ? clean : 'KP-COP-9482',
-        customerName: 'Cliente KuroPunk',
-        phone: clean.match(/^\d+$/) ? clean : '3015690382',
-        address: 'Carrera 7 # 72 - 41 (Chapinero)',
-        city: 'Bogotá D.C.',
-        subtotal: 145000,
-        shippingCost: 0,
-        total: 145000,
-        status: 'CONFIRMED',
-        createdAt: new Date().toISOString(),
-        items: [
-          {
-            title: 'The Wanderer Amigurumi // Flagship',
-            price: 145000,
-            quantity: 1,
-            color: 'Asphalt',
-            size: 'MED',
-            image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDOcXKo7gOBjP9ZlFxuVLSUyKqvrVSMOR3T4GQu3L1gJdI7keqGp4bmRraEi1rISe7iw2mEBtkwkvEkJLg5CZA2ziOSXiND7tI0DB-zDER3dqQDsJBK21ptyuOWVg9Lo02FTRwRqTpPCvha7EIyw1fgO1DYgfxscqUPuuwSymApqc6xfbzMN27yqEbR3uJ5x1d2RYT1UEwOwQOJjfqtHlCbhg799jVy85P7YOOhU5SRN1LepcqK06Zd'
-          }
-        ]
-      };
+      throw new Error(`No encontramos ninguna orden con el código "${clean}". Verifica tu código de pedido.`);
     }
   );
 }
@@ -496,12 +580,12 @@ export async function submitContactMessage(contactData) {
 }
 
 export async function getContactMessages() {
-  const adminKey = import.meta.env.VITE_ADMIN_KEY || 'kuropunk_admin_secret_2026';
+  const authHeaders = await getAdminAuthHeaders();
   return fetchWithFallback(
     `/contact`,
     {
       method: 'GET',
-      headers: { 'x-admin-key': adminKey },
+      headers: authHeaders,
     },
     () => {
       try {

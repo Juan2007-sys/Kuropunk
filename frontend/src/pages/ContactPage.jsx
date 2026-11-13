@@ -221,7 +221,7 @@ export const ContactPage = () => {
           <div className="space-y-3">
             <span className="font-mono text-xs text-[#e0141f] uppercase tracking-widest font-bold flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5" />
-              TALLER DE COMISIONES // 1-DE-1
+              TALLER DE COMISIONES · 1-DE-1
             </span>
             <h1 className="font-stencil text-4xl sm:text-5xl lg:text-6xl leading-none text-[#e6e1e1] uppercase tracking-tight">
               Cotiza Tu<br />
@@ -288,7 +288,7 @@ export const ContactPage = () => {
               <Phone className="w-3.5 h-3.5 text-[#e0141f]" /> LÍNEA DIRECTA DEL TALLER
             </div>
             <p className="font-mono text-sm text-[#e6e1e1]">
-              WhatsApp Oficial: <span className="text-emerald-400 font-bold">+57 301 569 0382</span>
+              WhatsApp Oficial: <span className="text-emerald-400 font-bold">+57 323 8937221</span>
             </p>
             <p className="font-mono text-xs text-[#e6e1e1] flex items-center gap-1.5 pt-0.5">
               <Instagram className="w-3.5 h-3.5 text-[#e0141f]" />
@@ -317,7 +317,7 @@ export const ContactPage = () => {
         >
           {/* Tape Overlay */}
           <div className="tape-overlay !top-[-12px] !right-6 !left-auto !bg-[#e0141f] !text-[#fff4f3] rotate-1 font-mono">
-            PASO {step} DE 3 // FORMULARIO TÁCTICO
+            PASO {step} DE 3 · FORMULARIO TÁCTICO
           </div>
 
           {/* SUCCESS SCREEN */}
@@ -363,7 +363,7 @@ export const ContactPage = () => {
                     className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20bd5a] text-black font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01] shadow-lg"
                   >
                     <MessageCircle className="w-5 h-5 fill-black" />
-                    <span>Abrir Chat con el Taller (+57 301 569 0382)</span>
+                    <span>Abrir Chat con el Taller (+57 323 8937221)</span>
                     <ArrowRight className="w-4 h-4" />
                   </a>
                 </div>

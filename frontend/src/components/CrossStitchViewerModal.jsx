@@ -131,7 +131,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
               <span className="w-3 h-3 bg-[#e0141f] animate-pulse shrink-0"></span>
               <div className="min-w-0">
                 <h3 className="font-headline-md text-sm sm:text-lg text-white tracking-wider uppercase truncate">
-                  VISOR DMC // {productTitle}
+                  VISOR DMC · {productTitle}
                 </h3>
                 <p className="text-[10px] sm:text-[11px] font-mono text-[#ffb4ab] truncate">
                   MATRIZ 14CT AIDA • TABLA DMC • TACHADO EN VIVO
@@ -334,7 +334,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
                       <div
                         key={cell.id}
                         onClick={() => toggleStitch(rIdx, cIdx)}
-                        title={`Fila ${rIdx + 1}, Columna ${cIdx + 1} // DMC ${cell.dmc}`}
+                        title={`Fila ${rIdx + 1}, Columna ${cIdx + 1} · DMC ${cell.dmc}`}
                         className={`w-7 h-7 sm:w-8 sm:h-8 border border-black/40 flex items-center justify-center text-xs font-bold transition-all relative cursor-pointer ${
                           isHighlighted ? 'opacity-100' : 'opacity-15 grayscale'
                         }`}
@@ -379,7 +379,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
           {/* Footer de Acciones */}
           <div className="flex items-center justify-between px-5 py-3 bg-[#161414] border-t border-neutral-800 text-xs font-mono">
             <span className="text-neutral-400">
-              PATRÓN ENCRIPTADO KUROPUNK // TALLER DE PUNTADA SUBVERSIVA
+              PATRÓN ENCRIPTADO KUROPUNK · TALLER DE PUNTADA SUBVERSIVA
             </span>
             <button
               onClick={() => window.print()}

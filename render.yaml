@@ -6,10 +6,19 @@ services:
     plan: free
     buildCommand: npm install && npm run build
     startCommand: npm run start:prod
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: CORS_ORIGIN
         value: https://kuropunk.vercel.app,https://frontend-cyan-nu-86.vercel.app
+      - key: FIREBASE_PROJECT_ID
+        value: kuroapp-62618
+      - key: ADMIN_EMAILS
+        value: juanque.ovalle@gmail.com,admin@kuropunk.co
       - key: ADMIN_SECRET_KEY
-        value: kuropunk_admin_secret_2026
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"

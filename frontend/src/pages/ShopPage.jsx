@@ -205,7 +205,7 @@ export const ShopPage = ({ onSelectProduct }) => {
     e.stopPropagation();
     try {
       downloadPatternPDF(item);
-      showToast(`DESCARGANDO PDF // ${item.title.toUpperCase()}`, "success");
+      showToast(`DESCARGANDO PDF · ${item.title.toUpperCase()}`, "success");
     } catch (err) {
       console.error(err);
       showToast("ERROR AL GENERAR EL DOCUMENTO", "error");
@@ -222,7 +222,7 @@ export const ShopPage = ({ onSelectProduct }) => {
       price: price,
       image: item.image
     });
-    showToast(`AGREGADO // ${title.toUpperCase()}`, "success");
+    showToast(`AGREGADO · ${title.toUpperCase()}`, "success");
   };
 
   const currentCount = 
@@ -304,7 +304,7 @@ export const ShopPage = ({ onSelectProduct }) => {
             {/* Subtitle / Telemetry */}
             <div className="hidden lg:flex items-center gap-3 text-[11px] font-mono text-neutral-500 tracking-wider pb-3">
               <span className="w-1.5 h-1.5 rounded-full bg-[#FF0033] animate-pulse"></span>
-              <span>KUROPUNK // ARCHIVE 2024</span>
+              <span>KUROPUNK · ARCHIVO 2024</span>
               <span>•</span>
               <span>WORLDWIDE DISPATCH</span>
             </div>
