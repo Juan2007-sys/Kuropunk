@@ -11,7 +11,7 @@ import {
 import { DEPOSIT_THRESHOLD_COP, PAYMENT_ACCOUNTS } from '../config/paymentConfig';
 import { AuthGuard } from '../guards/AuthGuard';
 import { downloadReceiptPDF } from '../utils/downloadPdf';
-import { formatCOP, generateWhatsAppOrderUrl } from '../utils/formatters';
+import { formatCOP, generateWhatsAppOrderUrl, buildWhatsAppOrderMessage } from '../utils/formatters';
 import { motion } from 'framer-motion';
 import { 
   Trash2, 
@@ -142,11 +142,12 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
 
     const unsub = subscribeToOrderById(orderConfirmed.id, handleLiveOrderUpdate);
     const pollInterval = setInterval(async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       try {
         const tracked = await trackOrder(orderConfirmed.id);
         if (tracked) handleLiveOrderUpdate(tracked);
       } catch {}
-    }, 6000);
+    }, 15000);
 
     return () => {
       unsub();
@@ -865,7 +866,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                 </div>
 
                 {/* Botón Principal WhatsApp para Atención Inmediata */}
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
                   <a
                     href={generateWhatsAppOrderUrl(orderConfirmed)}
                     target="_blank"
@@ -875,6 +876,14 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                     <MessageSquare className="w-5 h-5 fill-black" />
                     <span>Notificar al Taller por WhatsApp</span>
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => copyTextToClipboard(buildWhatsAppOrderMessage(orderConfirmed), 'MENSAJE CON EMOJIS COPIADO PARA PEGAR EN WHATSAPP')}
+                    className="w-full min-h-[40px] px-4 py-2 bg-[#141414] hover:bg-[#262424] border border-neutral-700 text-neutral-300 font-mono text-[11px] uppercase font-bold flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>Copiar mensaje con emojis (si usas App de PC)</span>
+                  </button>
                 </div>
 
                 {/* Botones de Acción Secundarios Post-Compra */}

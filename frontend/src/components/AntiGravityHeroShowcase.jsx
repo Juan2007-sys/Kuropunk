@@ -70,19 +70,24 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
   // 2. FÍSICA VECTORIAL Y LEVITACIÓN ANTIGRAVEDAD (requestAnimationFrame)
   // =========================================================================
   const stateRef = useRef({
-    // Vectores objetivo y actuales para LERP (interpolación suave)
+    // Vectores objetivo, actuales y velocidades (sistema masa-resorte-amortiguador)
     targetRotX: 0,
     targetRotY: 0,
     currentRotX: 0,
     currentRotY: 0,
+    velRotX: 0,
+    velRotY: 0,
     targetTransX: 0,
     currentTransX: 0,
+    velTransX: 0,
     targetTransZ: 0,
     currentTransZ: 0,
+    velTransZ: 0,
     normDistance: 0,
-    // Parámetros de onda armónica sinusoidal
+    // Parámetros de trayectoria paramétrica r(t)
     amplitude: 14,      // Amplitud A en píxeles
     frequency: 0.0022,  // Velocidad angular omega
+    lastTimestamp: null,
     animFrameId: null
   });
 
@@ -106,44 +111,66 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       isVisible = true;
     }
 
+    // Integrador semi-implícito de Euler para ecuación diferencial masa-resorte-amortiguador:
+    // a = k * (target - x) - c * v
+    const stepSpring = (pos, vel, target, dt) => {
+      const stiffness = 110;
+      const damping = 15;
+      const accel = stiffness * (target - pos) - damping * vel;
+      const nextVel = vel + accel * dt;
+      return [pos + nextVel * dt, nextVel];
+    };
+
     const updatePhysics = (timestamp) => {
       if (!isRunning) return;
 
       const s = stateRef.current;
+      const dt = s.lastTimestamp
+        ? Math.min(0.05, (timestamp - s.lastTimestamp) / 1000)
+        : 0.016;
+      s.lastTimestamp = timestamp;
 
       if (isVisible) {
-        // 4. Oscilación armónica continua tipo gravedad cero: A * sin(omega * t)
-        const harmonicLevitation = s.amplitude * Math.sin(s.frequency * timestamp);
+        // 4. Trayectoria paramétrica espacial r(t) = (x(t), y(t), z(t)) tipo Lissajous
+        const omegaX = 0.0014;
+        const omegaZ = 0.0011;
+        const paramX = 4.5 * Math.sin(omegaX * timestamp);
+        const paramY = s.amplitude * Math.sin(s.frequency * timestamp);
+        const paramZ = 6 * Math.cos(omegaZ * timestamp);
 
-        // LERP (Linear Interpolation) suave para inercia orgánica (alpha = 0.06)
-        const alpha = 0.06;
-        s.currentRotX += (s.targetRotX - s.currentRotX) * alpha;
-        s.currentRotY += (s.targetRotY - s.currentRotY) * alpha;
-        s.currentTransX += (s.targetTransX - s.currentTransX) * alpha;
-        s.currentTransZ += (s.targetTransZ - s.currentTransZ) * alpha;
+        // Vector velocidad tangente v(t) = r'(t) para inclinación dinámica sutil
+        const velParamX = 4.5 * omegaX * Math.cos(omegaX * timestamp);
+        const velParamY = s.amplitude * s.frequency * Math.cos(s.frequency * timestamp);
+        const pitchFromVel = -velParamY * 45;
+        const bankFromVel = velParamX * 140;
 
-        const totalY = harmonicLevitation;
+        // Integración del sistema masa-resorte-amortiguador
+        [s.currentRotX, s.velRotX] = stepSpring(s.currentRotX, s.velRotX, s.targetRotX, dt);
+        [s.currentRotY, s.velRotY] = stepSpring(s.currentRotY, s.velRotY, s.targetRotY, dt);
+        [s.currentTransX, s.velTransX] = stepSpring(s.currentTransX, s.velTransX, s.targetTransX, dt);
+        [s.currentTransZ, s.velTransZ] = stepSpring(s.currentTransZ, s.velTransZ, s.targetTransZ, dt);
+
+        const totalX = s.currentTransX + paramX;
+        const totalY = paramY;
+        const totalZ = s.currentTransZ + paramZ;
+        const totalRotX = s.currentRotX + pitchFromVel;
+        const totalRotY = s.currentRotY + bankFromVel;
 
         // Aplicar transformación tridimensional al muñeco con aceleración por hardware
         if (dollRef.current) {
           dollRef.current.style.transform = `
             perspective(1000px)
-            translate3d(${s.currentTransX.toFixed(2)}px, ${totalY.toFixed(2)}px, ${s.currentTransZ.toFixed(2)}px)
-            rotateX(${s.currentRotX.toFixed(2)}deg)
-            rotateY(${s.currentRotY.toFixed(2)}deg)
+            translate3d(${totalX.toFixed(2)}px, ${totalY.toFixed(2)}px, ${totalZ.toFixed(2)}px)
+            rotateX(${totalRotX.toFixed(2)}deg)
+            rotateY(${totalRotY.toFixed(2)}deg)
           `;
-
-          // Sombra proyectada responsiva a la altura de levitación
-          const shadowBlur = Math.max(15, 32 + -totalY * 1.2);
-          const shadowOpacity = Math.max(0.3, Math.min(0.85, 0.65 - -totalY * 0.015));
-          dollRef.current.style.filter = `drop-shadow(0px ${Math.max(25, 42 - totalY * 0.9)}px ${shadowBlur}px rgba(0, 0, 0, ${shadowOpacity}))`;
         }
 
         // Sombra en el suelo interactiva
         if (shadowRef.current) {
           const shadowScale = Math.max(0.65, Math.min(1.2, 0.95 - totalY * 0.018));
           const shadowAlpha = Math.max(0.2, Math.min(0.6, 0.45 + totalY * 0.012));
-          shadowRef.current.style.transform = `scale(${shadowScale.toFixed(3)}) translateX(${(s.currentTransX * 0.4).toFixed(1)}px)`;
+          shadowRef.current.style.transform = `scale(${shadowScale.toFixed(3)}) translateX(${(totalX * 0.4).toFixed(1)}px)`;
           shadowRef.current.style.opacity = shadowAlpha.toFixed(2);
         }
       }
@@ -267,7 +294,8 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
               className="w-full h-full object-contain will-change-transform pointer-events-none select-none"
               style={{
                 transformStyle: 'preserve-3d',
-                backfaceVisibility: 'hidden'
+                backfaceVisibility: 'hidden',
+                filter: 'drop-shadow(0px 32px 24px rgba(0, 0, 0, 0.6))'
               }}
             />
           </motion.div>

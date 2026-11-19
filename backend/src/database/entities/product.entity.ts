@@ -48,6 +48,9 @@ export class ProductEntity {
   @Column({ type: 'boolean', default: false })
   isHero: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
+
   @Column({ type: 'varchar', length: 100, nullable: true })
   badge: string;
 

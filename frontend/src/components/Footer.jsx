@@ -1,5 +1,6 @@
 import React from 'react';
 import logoNegro from '../assets/logo_negro.jpeg';
+import { buildWhatsAppUrl, WHATSAPP_PHONE } from '../utils/formatters';
 
 export const Footer = ({ setCurrentView }) => {
   return (
@@ -79,7 +80,7 @@ export const Footer = ({ setCurrentView }) => {
             <span className="w-1.5 h-1.5 bg-[#e0141f]"></span> Instagram Oficial (@kuropunk_)
           </a>
           <a
-            href="https://wa.me/573238937221"
+            href={buildWhatsAppUrl(WHATSAPP_PHONE)}
             target="_blank"
             rel="noopener noreferrer"
             className="font-body-md text-sm text-[#e7bcb8]/70 hover:text-[#ffb4ab] transition-colors flex items-center gap-2 min-h-[40px]"

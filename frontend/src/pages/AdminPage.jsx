@@ -16,6 +16,7 @@ import {
 } from '../services/firebase';
 import {
   formatCOP,
+  buildWhatsAppUrl,
   generateAdminToCustomerWhatsAppUrl,
   generateAdminDepositNoticeWhatsAppUrl,
 } from '../utils/formatters';
@@ -1028,7 +1029,7 @@ export function AdminPage({ onBackToShop }) {
 
                               {cleanPhone && (
                                 <a
-                                  href={`https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20el%20anticipo%20de%20tu%20orden%20%23${order.id}`}
+                                  href={buildWhatsAppUrl(cleanPhone, `Hola ${order.customerData?.name || order.customerName || 'Cliente'}, te escribimos de KuroPunk sobre el anticipo de tu orden #${order.id}`)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="py-2.5 px-3 bg-[#1d1b1b] hover:bg-neutral-800 border border-[#5e3f3c] text-emerald-400 font-bold text-[11px] uppercase flex items-center justify-center gap-1"
@@ -1206,7 +1207,7 @@ export function AdminPage({ onBackToShop }) {
                                       href={
                                         order.paymentStatus === 'ANTICIPO_VERIFICADO'
                                           ? generateAdminDepositNoticeWhatsAppUrl(order, 'CONFIRM')
-                                          : `https://wa.me/57${cleanPhone}?text=Hola%20${encodeURIComponent(order.customerData?.name || order.customerName || 'Cliente')},%20te%20escribimos%20de%20KuroPunk%20sobre%20tu%20orden%20%23${order.id}`
+                                          : buildWhatsAppUrl(cleanPhone, `Hola ${order.customerData?.name || order.customerName || 'Cliente'}, te escribimos de KuroPunk sobre tu orden #${order.id}`)
                                       }
                                       target="_blank"
                                       rel="noopener noreferrer"
@@ -1358,7 +1359,7 @@ export function AdminPage({ onBackToShop }) {
                 {/* Acciones directo con el cliente / Eliminar */}
                 <div className="flex gap-2 pt-2">
                   <a
-                    href={`https://wa.me/57${String(selectedOrderDetail.customerData?.phone || selectedOrderDetail.phone || '').replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(selectedOrderDetail.customerData?.name || selectedOrderDetail.customerName || 'Cliente')},%20te%20escribimos%20del%20taller%20KuroPunk%20sobre%20tu%20pedido%20%23${selectedOrderDetail.id}`}
+                    href={buildWhatsAppUrl(selectedOrderDetail.customerData?.phone || selectedOrderDetail.phone || '', `Hola ${selectedOrderDetail.customerData?.name || selectedOrderDetail.customerName || 'Cliente'}, te escribimos del taller KuroPunk sobre tu pedido #${selectedOrderDetail.id}`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 py-2.5 bg-[#25D366] hover:bg-[#1fa851] text-black font-bold uppercase flex items-center justify-center gap-2 shadow-lg text-xs"

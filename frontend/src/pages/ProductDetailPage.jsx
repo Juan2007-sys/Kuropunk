@@ -74,15 +74,26 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
 
   useEffect(() => {
     setQuantity(1);
-    if (product?.image) {
-      setActiveImage(product.image);
+    const primaryImg =
+      product?.image ||
+      product?.imageUrl ||
+      (product?.images && product?.images[0]) ||
+      PRODUCTS[0].image;
+    if (primaryImg) {
+      setActiveImage(primaryImg);
     }
     // Load reviews
+    let isMounted = true;
     setIsLoadingReviews(true);
     getProductReviews(product.id).then((res) => {
-      setReviews(res || []);
-      setIsLoadingReviews(false);
+      if (isMounted) {
+        setReviews(res || []);
+        setIsLoadingReviews(false);
+      }
     });
+    return () => {
+      isMounted = false;
+    };
   }, [product]);
 
   const handleAddToCart = () => {
@@ -144,9 +155,18 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
     showToast("¡GRACIAS POR TU OPINIÓN! RESEÑA PUBLICADA", "success");
   };
 
+  const primaryProductImage =
+    product.image ||
+    product.imageUrl ||
+    (product.images && product.images[0]) ||
+    PRODUCTS[0].image;
+  const secondaryProductImage =
+    product.altImage ||
+    (product.images && product.images.length > 1 ? product.images[1] : null);
+
   const galleryImages = [
-    { src: product.image },
-    ...(product.altImage ? [{ src: product.altImage }] : [])
+    { src: primaryProductImage },
+    ...(secondaryProductImage ? [{ src: secondaryProductImage }] : [])
   ];
 
   return (

@@ -114,6 +114,12 @@ export class AdminAuthGuard implements CanActivate {
         timeout: 4000,
       });
       const isFirestoreAdmin = docRes.data?.fields?.role?.stringValue === 'admin';
+      if (verifiedAdminRoleCache.size > 500) {
+        const nowMs = Date.now();
+        for (const [k, v] of verifiedAdminRoleCache.entries()) {
+          if (nowMs >= v.expiresAt) verifiedAdminRoleCache.delete(k);
+        }
+      }
       verifiedAdminRoleCache.set(uid, {
         isAdmin: isFirestoreAdmin,
         expiresAt: Date.now() + 5 * 60 * 1000,
@@ -175,6 +181,11 @@ export class AdminAuthGuard implements CanActivate {
     current.count += 1;
     if (current.count >= MAX_FAILED_ATTEMPTS) {
       current.lockUntil = now + LOCKOUT_MS;
+    }
+    if (failedAdminAttempts.size > 500) {
+      for (const [ip, rec] of failedAdminAttempts.entries()) {
+        if (now > rec.lockUntil) failedAdminAttempts.delete(ip);
+      }
     }
     failedAdminAttempts.set(clientIp, current);
 

@@ -74,6 +74,10 @@ export class UpdateProductDto {
   @IsOptional()
   isHero?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
   @IsString()
   @IsOptional()
   @MaxLength(50)
@@ -115,12 +119,12 @@ export class UpdateProductDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(500)
+  @MaxLength(60000)
   image?: string;
 
   @IsString()
   @IsOptional()
-  @MaxLength(500)
+  @MaxLength(60000)
   altImage?: string;
 
   @IsString()

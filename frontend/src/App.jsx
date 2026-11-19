@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Lenis from 'lenis';
 import { Toaster, toast } from 'sonner';
 import { subscribeToOrderById } from './services/firebase';
-import { trackOrder } from './services/api';
+import { trackOrder, getProductById } from './services/api';
 
 // Catálogo unificado para resolución directa de URLs compartidas y navegación
 const ALL_CATALOG_PRODUCTS = [...PRODUCTS, ...(PUNTO_CRUZ_PRODUCTS || []), ...(PATRONES_PRODUCTS || [])];
@@ -139,8 +139,9 @@ export function AppContent() {
         }
 
         if (
-          String(lastOrder.status || '').toUpperCase() === 'VERIFICANDO_ANTICIPO' ||
-          String(lastOrder.paymentStatus || '').toUpperCase() === 'VERIFICANDO_ANTICIPO'
+          (typeof document === 'undefined' || document.visibilityState === 'visible') &&
+          (String(lastOrder.status || '').toUpperCase() === 'VERIFICANDO_ANTICIPO' ||
+            String(lastOrder.paymentStatus || '').toUpperCase() === 'VERIFICANDO_ANTICIPO')
         ) {
           const tracked = await trackOrder(lastOrder.id).catch(() => null);
           if (tracked) checkAndNotify(tracked);
@@ -149,7 +150,7 @@ export function AppContent() {
     };
 
     syncWatcher();
-    const intervalId = setInterval(syncWatcher, 6000);
+    const intervalId = setInterval(syncWatcher, 15000);
 
     return () => {
       activeUnsub();
@@ -186,14 +187,31 @@ export function AppContent() {
 
   // Listener para soportar Botón Atrás (Back), Botón Adelante (Forward) y gestos táctiles móviles
   useEffect(() => {
+    const resolveProductFromRoute = (productId) => {
+      if (!productId) return;
+      const found = ALL_CATALOG_PRODUCTS.find(p => p.id === productId || p.sku === productId);
+      if (found) {
+        setSelectedProduct(found);
+      } else {
+        getProductById(productId)
+          .then((remoteProd) => {
+            if (remoteProd && remoteProd.id) setSelectedProduct(remoteProd);
+          })
+          .catch(() => {});
+      }
+    };
+
     const handleLocationChange = () => {
       const { view, productId } = parseHashRoute();
       if (view === 'product-detail' && productId) {
-        const found = ALL_CATALOG_PRODUCTS.find(p => p.id === productId || p.sku === productId);
-        if (found) setSelectedProduct(found);
+        resolveProductFromRoute(productId);
       }
       setCurrentViewState(view);
     };
+
+    if (initialRoute.view === 'product-detail' && initialRoute.productId) {
+      resolveProductFromRoute(initialRoute.productId);
+    }
 
     // Asegurar que la entrada inicial exista en el stack de historial
     if (!window.location.hash || window.location.hash === '#/' || window.location.hash === '#') {

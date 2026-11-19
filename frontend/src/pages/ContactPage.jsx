@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useCart } from '../context/CartContext';
 import { submitContactMessage } from '../services/api';
 import { saveContactMessageInFirestore, uploadProductImage } from '../services/firebase';
-import { formatCOP, generateCustomerToAdminWhatsAppUrl } from '../utils/formatters';
+import { formatCOP, generateCustomerToAdminWhatsAppUrl, buildCustomerToAdminWhatsAppMessage } from '../utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send,
@@ -23,7 +23,8 @@ import {
   ArrowRight,
   MessageCircle,
   Phone,
-  Instagram
+  Instagram,
+  Copy
 } from 'lucide-react';
 
 const PLATFORM_PRICE = 8000;
@@ -366,6 +367,17 @@ export const ContactPage = () => {
                     <span>Abrir Chat con el Taller (+57 323 8937221)</span>
                     <ArrowRight className="w-4 h-4" />
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(buildCustomerToAdminWhatsAppMessage(lastQuotePayload));
+                      toast.success('¡Mensaje con emojis copiado! Pégalo en WhatsApp.');
+                    }}
+                    className="w-full py-2.5 px-4 bg-[#141414] hover:bg-[#262424] border border-neutral-700 text-neutral-300 font-mono text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>Copiar mensaje con emojis (si usas App de PC)</span>
+                  </button>
                 </div>
               )}
 

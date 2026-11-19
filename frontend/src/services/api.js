@@ -18,16 +18,16 @@ const ALL_LOCAL_PRODUCTS = [...PRODUCTS, ...PUNTO_CRUZ_PRODUCTS, ...PATRONES_PRO
  * Helper to fetch with timeout and fallback
  */
 async function fetchWithFallback(url, options = {}, fallbackFn) {
+  const { timeoutMs = 12000, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
     const res = await fetch(`${API_BASE_URL}${url}`, {
-      ...options,
+      ...fetchOptions,
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        ...(options.headers || {}),
+        ...(fetchOptions.headers || {}),
       },
     });
 
@@ -40,6 +40,7 @@ async function fetchWithFallback(url, options = {}, fallbackFn) {
     const json = await res.json();
     return json.data !== undefined ? json.data : json;
   } catch (err) {
+    clearTimeout(timeoutId);
     // Graceful fallback when backend is offline or unreachable
     console.warn(`[KuroPunk API Offline] Falling back locally for ${url}:`, err.message);
     return fallbackFn();
@@ -248,17 +249,24 @@ export async function reportOrderPayment(orderId, { paymentReference, paymentPro
     if (dupErr.message?.includes('ya fue utilizado')) throw dupErr;
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
   try {
     const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/report-payment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ paymentReference: cleanRef, paymentProofUrl }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
-      const msg = Array.isArray(errBody.message) ? errBody.message.join(', ') : errBody.message;
-      throw new Error(msg || `Error al reportar comprobante (HTTP ${res.status})`);
+      const rawMsg = errBody?.error?.message || errBody?.message || errBody?.error;
+      const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg;
+      const httpErr = new Error(msg || `Error al reportar comprobante (HTTP ${res.status})`);
+      httpErr.status = res.status;
+      throw httpErr;
     }
 
     const json = await res.json();
@@ -266,10 +274,11 @@ export async function reportOrderPayment(orderId, { paymentReference, paymentPro
     syncOrderToLocalCache(updated);
     return updated;
   } catch (err) {
-    if (err.message?.includes('ya fue') || err.message?.includes('comprobante')) {
+    clearTimeout(timeoutId);
+    if (err.status || err.message?.includes('ya fue') || err.message?.includes('comprobante')) {
       throw err;
     }
-    // Fallback local
+    // Fallback local únicamente cuando el backend está offline / inalcanzable
     const updatedLocal = updateLocalOrderFields(orderId, {
       paymentReference: cleanRef,
       paymentProofUrl,
@@ -287,6 +296,8 @@ export async function reportOrderPayment(orderId, { paymentReference, paymentPro
 export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
   const act = String(action || '').toUpperCase();
   const authHeaders = await getAdminAuthHeaders();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
     const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/verify-deposit`, {
       method: 'PATCH',
@@ -295,14 +306,28 @@ export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
         ...authHeaders,
       },
       body: JSON.stringify({ action: act, notes }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const json = await res.json();
       const updated = json.data !== undefined ? json.data : json;
       syncOrderToLocalCache(updated);
       return updated;
     }
-  } catch {}
+    if (res.status === 401 || res.status === 403 || res.status === 400) {
+      const errBody = await res.json().catch(() => ({}));
+      const rawMsg = errBody?.error?.message || errBody?.message;
+      const err = new Error(rawMsg || `No autorizado para verificar anticipo (HTTP ${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err?.status === 401 || err?.status === 403 || err?.status === 400) {
+      throw err;
+    }
+  }
 
   const fields =
     act === 'CONFIRM'
@@ -399,7 +424,8 @@ export async function syncProductToBackendApi(productData) {
     price: Number(productData.price) || 0,
     stock: Number(productData.stock) || 0,
     description: productData.description || '',
-    image: productData.imageUrl || productData.image || '',
+    image: productData.imageUrl || productData.image || (productData.images && productData.images[0]) || '',
+    isActive: productData.isActive !== false,
   };
 
   try {

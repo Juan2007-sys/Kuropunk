@@ -118,7 +118,7 @@ export class OrdersService {
               badge: () =>
                 `CASE WHEN stock - ${qty} <= 0 THEN 'SOLD OUT' ELSE badge END`,
               badgeType: () =>
-                `CASE WHEN stock - ${qty} <= 0 THEN 'sold-out' ELSE badgeType END`,
+                `CASE WHEN stock - ${qty} <= 0 THEN 'sold-out' ELSE "badgeType" END`,
             })
             .where('id = :id AND stock >= :qty', {
               id: product.id,
@@ -505,7 +505,7 @@ export class OrdersService {
                 badge: () =>
                   `CASE WHEN badge = 'SOLD OUT' THEN 'EDICIÓN LIMITADA' ELSE badge END`,
                 badgeType: () =>
-                  `CASE WHEN badgeType = 'sold-out' THEN 'primary' ELSE badgeType END`,
+                  `CASE WHEN "badgeType" = 'sold-out' THEN 'primary' ELSE "badgeType" END`,
               })
               .where('id = :id', { id: item.productId })
               .execute();

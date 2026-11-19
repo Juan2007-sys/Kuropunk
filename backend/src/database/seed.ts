@@ -793,10 +793,16 @@ async function seed() {
   const reviewRepo = AppDataSource.getRepository(ReviewEntity);
 
   console.log(`📦 Checking ${INITIAL_PRODUCTS.length} catalog products (preserving live stock & prices)...`);
+  const ACTIVE_PRODUCT_IDS = new Set([
+    'jungkook-cooky-plataforma',
+    'dulce-princesa-plataforma',
+    'jungkook-cooky-pequeno',
+  ]);
   for (const prod of INITIAL_PRODUCTS) {
+    const defaultIsActive = ACTIVE_PRODUCT_IDS.has(prod.id);
     const existing = await productRepo.findOne({ where: { id: prod.id } });
     if (!existing) {
-      const entity = productRepo.create(prod as any);
+      const entity = productRepo.create({ ...prod, isActive: defaultIsActive } as any);
       await productRepo.save(entity);
       console.log(`  + Seeded new product: [${prod.sku}] ${prod.title}`);
     } else {
@@ -806,8 +812,11 @@ async function seed() {
       const preservedBadgeType = existing.badgeType;
       const preservedRating = existing.rating;
       const preservedReviewsCount = existing.reviewsCount;
+      const preservedIsActive =
+        typeof existing.isActive === 'boolean' ? existing.isActive : defaultIsActive;
 
       Object.assign(existing, prod, {
+        isActive: preservedIsActive,
         stock: typeof preservedStock === 'number' ? preservedStock : prod.stock,
         price: typeof preservedPrice === 'number' && preservedPrice > 0 ? preservedPrice : prod.price,
         badge: preservedBadge || prod.badge,

@@ -35,6 +35,7 @@ export const CartProvider = ({ children }) => {
               : Math.max(1, Number(item.quantity) || 1);
             return {
               ...item,
+              title: found?.title || String(item.title || '').replace(/\s*\/\/\s*/g, ' · '),
               quantity: safeQty,
               ...(typeof maxStock === 'number' ? { stock: maxStock } : {}),
               price: price || 50000
@@ -159,7 +160,7 @@ export const CartProvider = ({ children }) => {
           size: options.size || product.size || "MED",
           quantity: initialQty,
           ...(maxStock !== null ? { stock: maxStock } : {}),
-          image: product.image
+          image: product.image || product.imageUrl || (product.images && product.images[0]) || ''
         }
       ];
     });

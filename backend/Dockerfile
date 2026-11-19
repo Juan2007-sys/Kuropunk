@@ -37,5 +37,5 @@ COPY --from=builder /app/dist ./dist
 # Puerto expuesto por el backend NestJS
 EXPOSE 4000
 
-# Iniciar servidor
-CMD ["node", "dist/main"]
+# Iniciar servidor (ejecuta seed idempotente y levanta API)
+CMD ["npm", "run", "start:prod"]

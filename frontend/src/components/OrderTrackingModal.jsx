@@ -6,7 +6,7 @@ import {
   subscribeToOrderById,
 } from '../services/firebase';
 import { PAYMENT_ACCOUNTS } from '../config/paymentConfig';
-import { formatCOP, WHATSAPP_PHONE, WHATSAPP_PHONE_DISPLAY, generateWhatsAppTrackingUrl } from '../utils/formatters';
+import { formatCOP, WHATSAPP_PHONE, WHATSAPP_PHONE_DISPLAY, generateWhatsAppTrackingUrl, buildWhatsAppUrl } from '../utils/formatters';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { 
@@ -513,7 +513,7 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
             <div className="p-4 bg-[#111010] border border-neutral-800 text-xs font-mono text-neutral-400 flex items-center justify-between">
               <span>¿Tienes dudas con tu pedido?</span>
               <a
-                href={`https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent('🧶 *KUROPUNK* | *Atención al Cliente*\n\n¡Hola equipo KuroPunk! Tengo una consulta sobre una entrega.')}`}
+                href={buildWhatsAppUrl(WHATSAPP_PHONE, '🧶 *KUROPUNK* | *Atención al Cliente*\n\n¡Hola equipo KuroPunk! Tengo una consulta sobre una entrega.')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[#25D366] hover:underline flex items-center gap-1 font-bold"

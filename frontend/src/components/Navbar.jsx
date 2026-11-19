@@ -175,6 +175,7 @@ export const Navbar = ({
 
           {/* Cart Trigger with Spring Bounce */}
           <button
+            data-cart-target="true"
             onClick={() => setIsCartOpen(true)}
             className="relative min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded hover:bg-neutral-800 text-neutral-200 hover:text-white transition-colors group focus:outline-none focus:ring-1 focus:ring-[#e0141f]"
             aria-label={`Abrir carrito de compras con ${totalItems} productos`}

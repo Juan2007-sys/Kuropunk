@@ -94,6 +94,10 @@ export class CreateProductDto {
   @IsOptional()
   isHero?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
+
   @IsString()
   @IsOptional()
   @MaxLength(50)

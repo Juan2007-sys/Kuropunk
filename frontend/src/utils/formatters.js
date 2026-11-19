@@ -29,22 +29,63 @@ export function formatCOP(amount, showCurrencySuffix = true) {
 }
 
 /**
- * Generates an executive, cyberpunk-artisan WhatsApp link with prefilled order details for Contraentrega
+ * Detects whether the current browser is running on a mobile device.
+ * Mobile uses wa.me (native WhatsApp app); desktop uses web.whatsapp.com/send
+ * because Windows WhatsApp Desktop's whatsapp:// handler corrupts emojis into '?'.
  */
-export function generateWhatsAppOrderUrl(order) {
+export function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+    return true;
+  }
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    return window.matchMedia('(pointer: coarse)').matches && window.innerWidth <= 900;
+  }
+  return false;
+}
+
+/**
+ * Builds a cross-device WhatsApp URL preserving UTF-8 emojis on both mobile and PC.
+ * @param {string} phone - Phone number with or without country code (defaults to WHATSAPP_PHONE)
+ * @param {string} [message] - Prefilled UTF-8 message
+ * @param {{ mode?: 'mobile' | 'desktop' }} [options] - Optional override for deterministic testing
+ */
+export function buildWhatsAppUrl(phone = WHATSAPP_PHONE, message = '', options = {}) {
+  const cleanPhone = String(phone || WHATSAPP_PHONE).replace(/\D/g, '');
+  const e164Phone = cleanPhone.startsWith('57') && cleanPhone.length >= 12 ? cleanPhone : `57${cleanPhone}`;
+  const mode = options.mode || (isMobileDevice() ? 'mobile' : 'desktop');
+  const encodedText = message ? encodeURIComponent(message) : '';
+
+  if (mode === 'mobile') {
+    return encodedText
+      ? `https://wa.me/${e164Phone}?text=${encodedText}`
+      : `https://wa.me/${e164Phone}`;
+  }
+
+  return encodedText
+    ? `https://web.whatsapp.com/send?phone=${e164Phone}&text=${encodedText}`
+    : `https://web.whatsapp.com/send?phone=${e164Phone}`;
+}
+
+/**
+ * Builds the UTF-8 WhatsApp order summary message (safe for URL encoding and clipboard copy).
+ */
+export function buildWhatsAppOrderMessage(order) {
   const itemsText = (order.items || [])
     .map((item, idx) => {
       let itemPrice = Number(item.price);
       if (itemPrice > 0 && itemPrice < 1000) {
         itemPrice = itemPrice * 1000;
       }
+      const cleanTitle = String(item.title || '').replace(/\s*\/\/\s*/g, ' · ');
       const unitStr = item.quantity > 1 ? ` (${formatCOP(itemPrice)} c/u)` : '';
-      return `${idx + 1}. *${item.title}*\n   ▫️ Cantidad: ${item.quantity} und.${unitStr}\n   ▫️ Subtotal: ${formatCOP(itemPrice * item.quantity)}`;
+      return `${idx + 1}. *${cleanTitle}*\n   ▪️ Cantidad: ${item.quantity} und.${unitStr}\n   ▪️ Subtotal: ${formatCOP(itemPrice * item.quantity)}`;
     })
     .join('\n\n');
 
   const notesText = order.deliveryNotes
-    ? `\n▪️ *Indicaciones:* ${order.deliveryNotes}`
+    ? `\n• *Indicaciones:* ${order.deliveryNotes}`
     : '';
 
   const orderDate = new Date().toLocaleDateString('es-CO', {
@@ -75,7 +116,7 @@ export function generateWhatsAppOrderUrl(order) {
       `💵 *SALDO AL RECIBIR (80%):* *${formatCOP(remainingBalance)}*`
     : `💰 *TOTAL A PAGAR AL RECIBIR:* *${formatCOP(grandTotal)}*`;
 
-  const message = `🧶 *KUROPUNK* | *${requiresDeposit ? 'Orden con Anticipo 20%' : 'Nueva Orden Contraentrega'}*
+  return `🧶 *KUROPUNK* | *${requiresDeposit ? 'Orden con Anticipo 20%' : 'Nueva Orden Contraentrega'}*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ¡Hola equipo KuroPunk! Acabo de registrar mi pedido en la tienda${
@@ -103,17 +144,21 @@ ${paymentSummaryBlock}
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Quedo atento/a a la confirmación y entrega. ¡Muchas gracias! 🖤`;
+}
 
-  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(message)}`;
+/**
+ * Generates an executive, cyberpunk-artisan WhatsApp link with prefilled order details for Contraentrega
+ */
+export function generateWhatsAppOrderUrl(order, options) {
+  return buildWhatsAppUrl(WHATSAPP_PHONE, buildWhatsAppOrderMessage(order), options);
 }
 
 /**
  * Generates a direct WhatsApp notification link from Admin to the Customer when Deposit is Approved or Rejected
  */
-export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM') {
+export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM', options) {
   const rawPhone = String(order?.customerData?.phone || order?.phone || '').replace(/\D/g, '');
   if (!rawPhone) return '';
-  const e164Phone = rawPhone.startsWith('57') && rawPhone.length >= 12 ? rawPhone : `57${rawPhone}`;
   const customerName = order?.customerData?.name || order?.customerName || 'Cliente';
   const totalVal = Number(order?.totalAmount || order?.total || 0);
   const depositVal = Number(order?.depositRequiredAmount || order?.depositBaseAmount || Math.ceil(totalVal * 0.2));
@@ -126,7 +171,7 @@ export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM')
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
       `¡Hola *${customerName}*! Te confirmamos que hemos verificado y *ACEPTADO* tu anticipo del 20% (*${formatCOP(depositVal)}*) para tu pedido.\n\n` +
       `✅ *Estado actual:* En Cola Oficial de Producción\n` +
-      `📦 *Orden:* #${order.id}\n` +
+      `📋 *Orden:* #${order.id}\n` +
       `🔎 *Código de rastreo:* ${trackingCode}\n` +
       `💵 *Saldo a pagar al recibir (80%):* *${formatCOP(remainingVal)}*\n\n` +
       `Ya iniciamos el agendamiento de tu pieza en el taller y te avisaremos por aquí cuando salga a entrega. ¡Muchas gracias por tu compra! 🖤`
@@ -135,13 +180,13 @@ export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM')
       `Hola *${customerName}*, revisamos el soporte de la orden *#${order.id}* (Ref: ${order.paymentReference || 'N/A'}) por *${formatCOP(depositVal)}*, pero aún no nos refleja en cuenta o la captura no es legible.\n\n` +
       `Por favor envíanos la foto clara del comprobante por este chat o súbela nuevamente en la página con tu código de rastreo *${trackingCode}*. ¡Quedamos atentos!`;
 
-  return `https://wa.me/${e164Phone}?text=${encodeURIComponent(message)}`;
+  return buildWhatsAppUrl(rawPhone, message, options);
 }
 
 /**
  * Generates a direct WhatsApp link for custom commissions and contact inquiries
  */
-export function generateWhatsAppContactUrl({ name, email, type, message }) {
+export function generateWhatsAppContactUrl({ name, email, type, message }, options) {
   const typeLabels = {
     commission: 'Comisión 1-de-1 (Amigurumi Personalizado)',
     punto_cruz: 'Gráfico Personalizado (Punto Cruz)',
@@ -155,8 +200,8 @@ export function generateWhatsAppContactUrl({ name, email, type, message }) {
 ¡Hola equipo KuroPunk! Acabo de enviar una solicitud desde la página web:
 
 👤 *NOMBRE / ALIAS:* ${name || 'Sin nombre'}
-📧 *CORREO:* ${email || 'Sin correo'}
-📌 *TIPO:* ${label}
+• *CORREO:* ${email || 'Sin correo'}
+• *TIPO:* ${label}
 
 💬 *DETALLES DE LA PIEZA O CONSULTA:*
 "${message || 'Sin mensaje'}"
@@ -164,11 +209,12 @@ export function generateWhatsAppContactUrl({ name, email, type, message }) {
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 Quedo atento/a para cotizar y coordinar la creación de la pieza. ¡Muchas gracias! 🖤`;
 
-  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(text)}`;
+  return buildWhatsAppUrl(WHATSAPP_PHONE, text, options);
 }
-export function generateAdminToCustomerWhatsAppUrl(commission) {
+
+export function generateAdminToCustomerWhatsAppUrl(commission, options) {
   const cleanPhone = String(commission.phone || '').replace(/\D/g, '');
-  const destinationPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+  if (!cleanPhone) return '';
 
   const message = `🧶 *KUROPUNK · ATENCIÓN DE COMISIONES PERSONALIZADAS*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -184,21 +230,24 @@ Soy del equipo de *KuroPunk*. Estuvimos revisando la cotización que registraste
 • *Precio Estimado:* ${formatCOP(commission.estimatedPrice || 50000)}
 • *Tiempo Estimado de Taller:* ${commission.estimatedDays || '4 a 6'} días hábiles
 
-💬 *Tu idea:* "${commission.message || 'Sin mensaje adicional'}"
+💡 *Tu idea:* "${commission.message || 'Sin mensaje adicional'}"
 
 Quiero conocer más a fondo tu cotización y orientarte con los materiales, colores y diseño para que quede exactamente como te lo imaginas. ¿Tienes alguna foto o detalle adicional que quieras compartirme? 🖤`;
 
-  return `https://wa.me/${destinationPhone}?text=${encodeURIComponent(message)}`;
+  return buildWhatsAppUrl(cleanPhone, message, options);
 }
 
-export function generateCustomerToAdminWhatsAppUrl(commission) {
-  const message = `🧶 *KUROPUNK · SOLICITUD DE COTIZACIÓN*
+/**
+ * Builds the UTF-8 WhatsApp message for customer-to-admin quote inquiries.
+ */
+export function buildCustomerToAdminWhatsAppMessage(commission) {
+  return `🧶 *KUROPUNK · SOLICITUD DE COTIZACIÓN*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 ¡Hola equipo KuroPunk! Acabo de calcular una cotización en la tienda web:
 
 👤 *NOMBRE:* ${commission.name || 'Cliente'}
-📱 *MI TELÉFONO:* ${commission.phone || 'N/A'}
-📧 *EMAIL:* ${commission.email || 'N/A'}
+• *MI TELÉFONO:* ${commission.phone || 'N/A'}
+• *EMAIL:* ${commission.email || 'N/A'}
 
 📋 *DETALLES COTIZADOS:*
 • *Pieza:* ${commission.typeLabel || commission.type || 'Amigurumi'}
@@ -208,15 +257,17 @@ export function generateCustomerToAdminWhatsAppUrl(commission) {
 • *Precio Estimado:* ${formatCOP(commission.estimatedPrice || 50000)}
 • *Tiempo Estimado:* ${commission.estimatedDays || '4-6'} días hábiles
 
-💬 *Mensaje:* "${commission.message || 'Sin mensaje'}"
+💡 *Mensaje:* "${commission.message || 'Sin mensaje'}"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 Quedo a la espera de su respuesta para acordar los detalles. ¡Gracias! 🖤`;
-
-  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(message)}`;
 }
 
-export function generateWhatsAppTrackingUrl(orderId, phone) {
+export function generateCustomerToAdminWhatsAppUrl(commission, options) {
+  return buildWhatsAppUrl(WHATSAPP_PHONE, buildCustomerToAdminWhatsAppMessage(commission), options);
+}
+
+export function generateWhatsAppTrackingUrl(orderId, phone, options) {
   const message = `🧶 *KUROPUNK* | *Seguimiento de Pedido*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -228,5 +279,5 @@ Quisiera consultar el estado actual de mi pedido contraentrega:
 
 ¿Me podrían confirmar en qué fase de confección o ruta de despacho se encuentra? ¡Muchas gracias! 🖤`;
 
-  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(message)}`;
+  return buildWhatsAppUrl(WHATSAPP_PHONE, message, options);
 }

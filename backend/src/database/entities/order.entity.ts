@@ -54,10 +54,10 @@ export class OrderEntity {
   @Column({ type: 'text', nullable: true })
   paymentProofUrl: string;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ nullable: true })
   paymentReportedAt: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ nullable: true })
   queuedAt: Date;
 
   @Column({ type: 'varchar', length: 50, default: 'CONFIRMED' })
