@@ -16,7 +16,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
       <section className="relative w-full min-h-[85vh] flex items-center justify-center overflow-hidden -mt-20 pt-28 pb-16">
         {/* Background Concrete Decay Image */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-luminosity"
+          className="absolute inset-0 bg-cover bg-center opacity-35 sm:opacity-40 sm:mix-blend-luminosity"
           style={{
             backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuBl3lwFZUMfheqnSQOHnN-MKt0EgDSq_vJmUd9_8iNJ5ye05z5hcIwBag8_YIzL-JkyPny6tO2ft5SnD4fZ1OP4osRThAUHckQjVAlJiUr4-SuBjpTLK82jTm8wuMPJasWe2mU3d-lNH0_lPj4rReYeUXDbnu2MMYipoyAxvg2ph-lF4Id2xw0w0w6GVsf1MSztnkj9edWDzFJ2ntwoUO5gC_wMFf2Imqe1Y2l_Tpt5g0qaqwNlMfO2')`
           }}

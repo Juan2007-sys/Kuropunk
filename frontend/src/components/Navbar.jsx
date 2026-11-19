@@ -38,10 +38,16 @@ export const Navbar = ({
   };
 
   return (
-    <header className="fixed top-0 w-full z-40 transition-all duration-500 concrete-texture brutalist-border border-t-0 border-x-0 overflow-hidden backdrop-blur-md bg-[#141313]/95 shadow-xl">
-      {/* Dynamic light glows */}
-      <div className="absolute top-[-50px] left-[15%] w-[250px] h-[250px] bg-[#ffb4ab] rounded-full blur-[100px] opacity-15 pointer-events-none"></div>
-      <div className="absolute top-[-20px] right-[25%] w-[350px] h-[150px] bg-[#e0141f] rounded-full blur-[120px] opacity-15 pointer-events-none"></div>
+    <header className="fixed top-0 w-full z-40 transition-colors duration-300 concrete-texture brutalist-border border-t-0 border-x-0 overflow-hidden bg-[#141313] sm:bg-[#141313]/95 sm:backdrop-blur-md shadow-xl">
+      {/* Dynamic light glows (gradiente radial sin costo de blur en GPU móvil) */}
+      <div
+        className="absolute top-[-50px] left-[15%] w-[250px] h-[250px] rounded-full opacity-20 pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(255,180,171,0.45) 0%, rgba(255,180,171,0) 70%)' }}
+      ></div>
+      <div
+        className="absolute top-[-20px] right-[25%] w-[350px] h-[150px] rounded-full opacity-20 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(224,20,31,0.5) 0%, rgba(224,20,31,0) 70%)' }}
+      ></div>
 
       <div className="h-16 sm:h-20 lg:h-24 w-full px-2.5 sm:px-6 lg:px-8 flex items-center justify-between relative max-w-7xl mx-auto gap-1 sm:gap-2">
         {/* Mobile Hamburger Button */}

@@ -161,10 +161,6 @@ export const ProductCard = ({ product, onSelectProduct, delayIndex = 0 }) => {
         onMouseMove={handleMouseMove}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        onTouchStart={handleTouchMove}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleMouseLeave}
-        onTouchCancel={handleMouseLeave}
         style={{ transformStyle: 'preserve-3d', transition: 'transform 160ms ease-out' }}
         className={`group flex flex-col h-full cursor-pointer bg-[#0e0e0e] border transition-colors duration-300 relative overflow-hidden staple-corner ${
           isSoldOut 

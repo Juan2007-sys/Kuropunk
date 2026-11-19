@@ -94,6 +94,23 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
   useEffect(() => {
     let isRunning = true;
     let isVisible = true;
+    let isScrolling = false;
+    let scrollTimeoutId = null;
+    const isMobile =
+      typeof window !== 'undefined' &&
+      (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
+    const minFrameMs = isMobile ? 32 : 16;
+    let lastDrawTime = 0;
+
+    const handleScroll = () => {
+      if (!isMobile) return;
+      isScrolling = true;
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
+      scrollTimeoutId = setTimeout(() => {
+        isScrolling = false;
+      }, 120);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     // IntersectionObserver to pause loop when Hero is completely off screen
     let observer;
@@ -123,65 +140,63 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
 
     const updatePhysics = (timestamp) => {
       if (!isRunning) return;
+      stateRef.current.animFrameId = requestAnimationFrame(updatePhysics);
+
+      if (!isVisible || isScrolling) return;
+      if (timestamp - lastDrawTime < minFrameMs) return;
 
       const s = stateRef.current;
       const dt = s.lastTimestamp
         ? Math.min(0.05, (timestamp - s.lastTimestamp) / 1000)
         : 0.016;
       s.lastTimestamp = timestamp;
+      lastDrawTime = timestamp;
 
-      if (isVisible) {
-        // 4. Trayectoria paramétrica espacial r(t) = (x(t), y(t), z(t)) tipo Lissajous
-        const omegaX = 0.0014;
-        const omegaZ = 0.0011;
-        const paramX = 4.5 * Math.sin(omegaX * timestamp);
-        const paramY = s.amplitude * Math.sin(s.frequency * timestamp);
-        const paramZ = 6 * Math.cos(omegaZ * timestamp);
+      // 4. Trayectoria paramétrica espacial r(t) = (x(t), y(t), z(t)) tipo Lissajous
+      const omegaX = 0.0014;
+      const omegaZ = 0.0011;
+      const paramX = 4.5 * Math.sin(omegaX * timestamp);
+      const paramY = s.amplitude * Math.sin(s.frequency * timestamp);
+      const paramZ = 6 * Math.cos(omegaZ * timestamp);
 
-        // Vector velocidad tangente v(t) = r'(t) para inclinación dinámica sutil
-        const velParamX = 4.5 * omegaX * Math.cos(omegaX * timestamp);
-        const velParamY = s.amplitude * s.frequency * Math.cos(s.frequency * timestamp);
-        const pitchFromVel = -velParamY * 45;
-        const bankFromVel = velParamX * 140;
+      // Vector velocidad tangente v(t) = r'(t) para inclinación dinámica sutil
+      const velParamX = 4.5 * omegaX * Math.cos(omegaX * timestamp);
+      const velParamY = s.amplitude * s.frequency * Math.cos(s.frequency * timestamp);
+      const pitchFromVel = -velParamY * 45;
+      const bankFromVel = velParamX * 140;
 
-        // Integración del sistema masa-resorte-amortiguador
-        [s.currentRotX, s.velRotX] = stepSpring(s.currentRotX, s.velRotX, s.targetRotX, dt);
-        [s.currentRotY, s.velRotY] = stepSpring(s.currentRotY, s.velRotY, s.targetRotY, dt);
-        [s.currentTransX, s.velTransX] = stepSpring(s.currentTransX, s.velTransX, s.targetTransX, dt);
-        [s.currentTransZ, s.velTransZ] = stepSpring(s.currentTransZ, s.velTransZ, s.targetTransZ, dt);
+      // Integración del sistema masa-resorte-amortiguador
+      [s.currentRotX, s.velRotX] = stepSpring(s.currentRotX, s.velRotX, s.targetRotX, dt);
+      [s.currentRotY, s.velRotY] = stepSpring(s.currentRotY, s.velRotY, s.targetRotY, dt);
+      [s.currentTransX, s.velTransX] = stepSpring(s.currentTransX, s.velTransX, s.targetTransX, dt);
+      [s.currentTransZ, s.velTransZ] = stepSpring(s.currentTransZ, s.velTransZ, s.targetTransZ, dt);
 
-        const totalX = s.currentTransX + paramX;
-        const totalY = paramY;
-        const totalZ = s.currentTransZ + paramZ;
-        const totalRotX = s.currentRotX + pitchFromVel;
-        const totalRotY = s.currentRotY + bankFromVel;
+      const totalX = s.currentTransX + paramX;
+      const totalY = paramY;
+      const totalZ = s.currentTransZ + paramZ;
+      const totalRotX = s.currentRotX + pitchFromVel;
+      const totalRotY = s.currentRotY + bankFromVel;
 
-        // Aplicar transformación tridimensional al muñeco con aceleración por hardware
-        if (dollRef.current) {
-          dollRef.current.style.transform = `
-            perspective(1000px)
-            translate3d(${totalX.toFixed(2)}px, ${totalY.toFixed(2)}px, ${totalZ.toFixed(2)}px)
-            rotateX(${totalRotX.toFixed(2)}deg)
-            rotateY(${totalRotY.toFixed(2)}deg)
-          `;
-        }
-
-        // Sombra en el suelo interactiva
-        if (shadowRef.current) {
-          const shadowScale = Math.max(0.65, Math.min(1.2, 0.95 - totalY * 0.018));
-          const shadowAlpha = Math.max(0.2, Math.min(0.6, 0.45 + totalY * 0.012));
-          shadowRef.current.style.transform = `scale(${shadowScale.toFixed(3)}) translateX(${(totalX * 0.4).toFixed(1)}px)`;
-          shadowRef.current.style.opacity = shadowAlpha.toFixed(2);
-        }
+      // Aplicar transformación tridimensional al muñeco con aceleración por hardware
+      if (dollRef.current) {
+        dollRef.current.style.transform = `perspective(1000px) translate3d(${totalX.toFixed(1)}px, ${totalY.toFixed(1)}px, ${totalZ.toFixed(1)}px) rotateX(${totalRotX.toFixed(1)}deg) rotateY(${totalRotY.toFixed(1)}deg)`;
       }
 
-      stateRef.current.animFrameId = requestAnimationFrame(updatePhysics);
+      // Sombra en el suelo interactiva
+      if (shadowRef.current) {
+        const shadowScale = Math.max(0.65, Math.min(1.2, 0.95 - totalY * 0.018));
+        const shadowAlpha = Math.max(0.2, Math.min(0.6, 0.45 + totalY * 0.012));
+        shadowRef.current.style.transform = `translate3d(${(totalX * 0.4).toFixed(1)}px, 0, 0) scale(${shadowScale.toFixed(2)})`;
+        shadowRef.current.style.opacity = shadowAlpha.toFixed(2);
+      }
     };
 
     stateRef.current.animFrameId = requestAnimationFrame(updatePhysics);
 
     return () => {
       isRunning = false;
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
       if (observer) observer.disconnect();
       if (stateRef.current.animFrameId) {
         cancelAnimationFrame(stateRef.current.animFrameId);
@@ -263,13 +278,21 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       className="relative z-10 w-full min-h-[440px] sm:min-h-[520px] flex flex-col items-center justify-center select-none touch-pan-y overflow-x-clip"
       style={{ perspective: '1200px' }}
     >
-      {/* Luz volumétrica de fondo (Glow carmesí) */}
-      <div className="absolute w-[280px] sm:w-[380px] h-[280px] sm:h-[380px] bg-[#e0141f]/25 rounded-full blur-[110px] pointer-events-none animate-pulse -z-10" />
+      {/* Luz volumétrica de fondo (Gradiente radial sin costo de Gaussian Blur en GPU móvil) */}
+      <div
+        className="absolute w-[300px] sm:w-[420px] h-[300px] sm:h-[420px] rounded-full pointer-events-none -z-10"
+        style={{
+          background: 'radial-gradient(circle, rgba(224, 20, 31, 0.28) 0%, rgba(224, 20, 31, 0.08) 45%, rgba(224, 20, 31, 0) 72%)',
+        }}
+      />
 
-      {/* Sombra de suelo reactiva con blur dinámico */}
+      {/* Sombra de suelo reactiva acelerada por GPU (translate3d + scale) */}
       <div
         ref={shadowRef}
-        className="absolute bottom-8 w-44 sm:w-56 h-6 bg-black/60 rounded-full blur-xl pointer-events-none transition-transform duration-100 ease-out -z-10"
+        className="absolute bottom-6 w-48 sm:w-60 h-8 rounded-full pointer-events-none will-change-transform -z-10"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0) 75%)',
+        }}
       />
 
       {/* Muñeco interactivo en levitación con física vectorial */}
@@ -281,28 +304,28 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
         <AnimatePresence initial={false} mode="wait">
           <motion.div
             key={activeProduct.id || currentIndex}
-            initial={{ opacity: 0, scale: 0.92, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, scale: 1.05, filter: 'blur(4px)' }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.04 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
             className="flex items-center justify-center w-[290px] h-[290px] sm:w-[370px] sm:h-[370px] md:w-[420px] md:h-[420px] relative"
           >
             <img
               ref={dollRef}
               src={activeImage}
               alt={activeProduct.title}
+              decoding="async"
               className="w-full h-full object-contain will-change-transform pointer-events-none select-none"
               style={{
                 transformStyle: 'preserve-3d',
                 backfaceVisibility: 'hidden',
-                filter: 'drop-shadow(0px 32px 24px rgba(0, 0, 0, 0.6))'
               }}
             />
           </motion.div>
         </AnimatePresence>
 
         {/* Insignia HUD Flotante Minimalista */}
-        <div className="absolute -bottom-2 sm:bottom-2 right-2 sm:right-6 z-20 bg-[#141313]/95 border border-[#e0141f] px-3.5 py-2 backdrop-blur-md shadow-[0_0_20px_rgba(224,20,31,0.35)] flex flex-col gap-0.5 group-hover:scale-105 transition-transform duration-300">
+        <div className="absolute -bottom-2 sm:bottom-2 right-2 sm:right-6 z-20 bg-[#141313] sm:bg-[#141313]/95 border border-[#e0141f] px-3.5 py-2 sm:backdrop-blur-md shadow-[0_0_20px_rgba(224,20,31,0.35)] flex flex-col gap-0.5 group-hover:scale-105 transition-transform duration-300">
           <div className="flex items-center gap-1.5 text-[9px] font-mono text-[#ffb4ab] uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-[#e0141f] animate-ping" />
             <span translate="no">

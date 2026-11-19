@@ -14,6 +14,8 @@ export const ConcreteShaderCanvas = () => {
 
     let animationFrameId;
     let isVisible = true;
+    let isScrolling = false;
+    let scrollTimer = null;
 
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
@@ -22,7 +24,18 @@ export const ConcreteShaderCanvas = () => {
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize, { passive: true });
+
+    // En móvil, pausar redibujado durante el scroll vertical para dar prioridad 100% al compositor nativo
+    const handleScroll = () => {
+      if (!isMobile) return;
+      isScrolling = true;
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        isScrolling = false;
+      }, 120);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     // Mouse & touch coordinates
     let mouse = { x: width * 0.7, y: height * 0.3, targetX: width * 0.7, targetY: height * 0.3 };
@@ -31,24 +44,26 @@ export const ConcreteShaderCanvas = () => {
       mouse.targetX = e.clientX;
       mouse.targetY = e.clientY;
     };
-    const handleTouchMove = (e) => {
+    const handleTouchStart = (e) => {
       if (e.touches && e.touches[0]) {
         mouse.targetX = e.touches[0].clientX;
         mouse.targetY = e.touches[0].clientY;
       }
     };
-    window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    window.addEventListener('touchstart', handleTouchMove, { passive: true });
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    if (!isMobile) {
+      window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    } else {
+      window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    }
 
-    // Particles array (18 on mobile for battery efficiency, 42 on desktop - IEEE spec)
-    const particleCount = isMobile ? 18 : 42;
+    // Particles array (14 on mobile for battery & scroll fluidity, 42 on desktop - IEEE spec)
+    const particleCount = isMobile ? 14 : 42;
     const particles = Array.from({ length: particleCount }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
       vx: 0,
       vy: 0,
-      size: Math.random() * 2.6 + 1.5,
+      size: Math.random() * 2.4 + 1.4,
       speedX: (Math.random() - 0.5) * 0.35,
       speedY: (Math.random() - 0.5) * 0.35 - 0.15,
       opacity: Math.random() * 0.45 + 0.3,
@@ -57,13 +72,13 @@ export const ConcreteShaderCanvas = () => {
 
     let time = 0;
     let lastDraw = 0;
-    const frameInterval = isMobile ? 33 : 16;
+    const frameInterval = isMobile ? 36 : 16;
 
     const render = (now = 0) => {
       if (!isVisible) return;
       animationFrameId = requestAnimationFrame(render);
 
-      if (now - lastDraw < frameInterval) return;
+      if (isScrolling || now - lastDraw < frameInterval) return;
       lastDraw = now;
       time += 0.015;
 
@@ -73,15 +88,17 @@ export const ConcreteShaderCanvas = () => {
 
       ctx.clearRect(0, 0, width, height);
 
-      // Halos sutiles del campo de potencial repulsivo alrededor del cursor
-      const cursorGrad = ctx.createRadialGradient(mouse.x, mouse.y, 4, mouse.x, mouse.y, 180);
-      cursorGrad.addColorStop(0, 'rgba(224, 20, 31, 0.10)');
-      cursorGrad.addColorStop(0.5, 'rgba(224, 20, 31, 0.03)');
-      cursorGrad.addColorStop(1, 'rgba(224, 20, 31, 0)');
-      ctx.fillStyle = cursorGrad;
-      ctx.beginPath();
-      ctx.arc(mouse.x, mouse.y, 180, 0, Math.PI * 2);
-      ctx.fill();
+      // Halos sutiles del campo de potencial repulsivo alrededor del cursor (solo escritorio)
+      if (!isMobile) {
+        const cursorGrad = ctx.createRadialGradient(mouse.x, mouse.y, 4, mouse.x, mouse.y, 180);
+        cursorGrad.addColorStop(0, 'rgba(224, 20, 31, 0.10)');
+        cursorGrad.addColorStop(0.5, 'rgba(224, 20, 31, 0.03)');
+        cursorGrad.addColorStop(1, 'rgba(224, 20, 31, 0)');
+        ctx.fillStyle = cursorGrad;
+        ctx.beginPath();
+        ctx.arc(mouse.x, mouse.y, 180, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Floating grime / ash embers driven by a 2D vector field F(x, y, t) + cursor potential gradient
       for (let i = 0; i < particles.length; i++) {
@@ -156,10 +173,11 @@ export const ConcreteShaderCanvas = () => {
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('touchstart', handleTouchMove);
-      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchstart', handleTouchStart);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (scrollTimer) clearTimeout(scrollTimer);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);

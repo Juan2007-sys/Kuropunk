@@ -124,20 +124,17 @@
   z-index: 30;
   box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.6);
   clip-path: polygon(5% 0%, 95% 4%, 100% 90%, 2% 100%);
-  mix-blend-mode: luminosity;
 }
 
 .spray-stroke-red {
   position: absolute;
-  background: radial-gradient(ellipse at center, rgba(224, 20, 31, 0.8) 0%, rgba(224, 20, 31, 0) 70%);
-  filter: blur(14px);
+  background: radial-gradient(ellipse at center, rgba(224, 20, 31, 0.65) 0%, rgba(224, 20, 31, 0.2) 45%, rgba(224, 20, 31, 0) 75%);
   pointer-events: none;
 }
 
 .spray-stroke-white {
   position: absolute;
-  background: radial-gradient(ellipse at center, rgba(201, 201, 196, 0.6) 0%, rgba(201, 201, 196, 0) 70%);
-  filter: blur(12px);
+  background: radial-gradient(ellipse at center, rgba(201, 201, 196, 0.5) 0%, rgba(201, 201, 196, 0.15) 45%, rgba(201, 201, 196, 0) 75%);
   pointer-events: none;
 }
 
