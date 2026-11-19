@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
  * Lanza una partícula hacia el carrito siguiendo una curva paramétrica de Bézier cuadrática r(t)
  * y orientándola según su vector tangente r'(t) = dr/dt.
  */
-function launchCartBezierFlight(sourceEl, onArrive) {
+export function launchCartBezierFlight(sourceEl, onArrive) {
   if (typeof window === 'undefined' || !sourceEl) {
     if (onArrive) onArrive();
     return;
@@ -84,7 +84,7 @@ export const ProductCard = ({ product, onSelectProduct, delayIndex = 0 }) => {
       const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
       const ny = ((clientY - rect.top) / rect.height) * 2 - 1;
 
-      const maxTiltDeg = 6;
+      const maxTiltDeg = 9;
       const rotX = -ny * maxTiltDeg;
       const rotY = nx * maxTiltDeg;
       cardRef.current.style.transform = `perspective(900px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
@@ -100,8 +100,8 @@ export const ProductCard = ({ product, onSelectProduct, delayIndex = 0 }) => {
 
         const px = ((nx + 1) * 50).toFixed(1);
         const py = ((ny + 1) * 50).toFixed(1);
-        glareRef.current.style.opacity = (nDotL * 0.35).toFixed(3);
-        glareRef.current.style.background = `radial-gradient(circle at ${px}% ${py}%, rgba(255, 180, 171, 0.35), rgba(224, 20, 31, 0.08) 45%, transparent 72%)`;
+        glareRef.current.style.opacity = (nDotL * 0.55).toFixed(3);
+        glareRef.current.style.background = `radial-gradient(circle at ${px}% ${py}%, rgba(255, 180, 171, 0.45), rgba(224, 20, 31, 0.14) 45%, transparent 72%)`;
       }
     });
   };

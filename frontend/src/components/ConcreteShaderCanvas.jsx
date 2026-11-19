@@ -41,18 +41,18 @@ export const ConcreteShaderCanvas = () => {
     window.addEventListener('touchstart', handleTouchMove, { passive: true });
     window.addEventListener('touchmove', handleTouchMove, { passive: true });
 
-    // Particles array (14 on mobile for battery efficiency, 28 on desktop)
-    const particleCount = isMobile ? 14 : 28;
+    // Particles array (18 on mobile for battery efficiency, 42 on desktop - IEEE spec)
+    const particleCount = isMobile ? 18 : 42;
     const particles = Array.from({ length: particleCount }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
       vx: 0,
       vy: 0,
-      size: Math.random() * 2.2 + 1.2,
-      speedX: (Math.random() - 0.5) * 0.2,
-      speedY: (Math.random() - 0.5) * 0.2 - 0.08,
-      opacity: Math.random() * 0.4 + 0.18,
-      color: Math.random() > 0.55 ? '#e0141f' : '#d6d6d0'
+      size: Math.random() * 2.6 + 1.5,
+      speedX: (Math.random() - 0.5) * 0.35,
+      speedY: (Math.random() - 0.5) * 0.35 - 0.15,
+      opacity: Math.random() * 0.45 + 0.3,
+      color: Math.random() > 0.45 ? '#e0141f' : '#e6e1e1'
     }));
 
     let time = 0;
@@ -65,34 +65,44 @@ export const ConcreteShaderCanvas = () => {
 
       if (now - lastDraw < frameInterval) return;
       lastDraw = now;
-      time += 0.012;
+      time += 0.015;
 
       // Smooth mouse lerping
-      mouse.x += (mouse.targetX - mouse.x) * 0.08;
-      mouse.y += (mouse.targetY - mouse.y) * 0.08;
+      mouse.x += (mouse.targetX - mouse.x) * 0.12;
+      mouse.y += (mouse.targetY - mouse.y) * 0.12;
 
       ctx.clearRect(0, 0, width, height);
+
+      // Halos sutiles del campo de potencial repulsivo alrededor del cursor
+      const cursorGrad = ctx.createRadialGradient(mouse.x, mouse.y, 4, mouse.x, mouse.y, 180);
+      cursorGrad.addColorStop(0, 'rgba(224, 20, 31, 0.10)');
+      cursorGrad.addColorStop(0.5, 'rgba(224, 20, 31, 0.03)');
+      cursorGrad.addColorStop(1, 'rgba(224, 20, 31, 0)');
+      ctx.fillStyle = cursorGrad;
+      ctx.beginPath();
+      ctx.arc(mouse.x, mouse.y, 180, 0, Math.PI * 2);
+      ctx.fill();
 
       // Floating grime / ash embers driven by a 2D vector field F(x, y, t) + cursor potential gradient
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         // Campo vectorial de flujo F(x, y, t) = (sin(ay + wt), cos(ax - wt))
         const fieldScale = 0.0035;
-        const fieldStrength = 0.018;
+        const fieldStrength = 0.028;
         let fx = Math.sin(p.y * fieldScale + time * 0.7) * fieldStrength;
         let fy = Math.cos(p.x * fieldScale - time * 0.5) * fieldStrength;
 
-        // Gradiente de potencial repulsivo + componente rotacional alrededor del cursor
+        // Gradiente de potencial repulsivo (-grad V) + componente rotacional (-uy, ux) alrededor del cursor
         const dx = p.x - mouse.x;
         const dy = p.y - mouse.y;
         const distSq = dx * dx + dy * dy;
-        const influenceRadius = 200;
+        const influenceRadius = 220;
 
         if (distSq > 1 && distSq < influenceRadius * influenceRadius) {
           const dist = Math.sqrt(distSq);
           const ux = dx / dist;
           const uy = dy / dist;
-          const force = 1400 / (distSq + 600);
+          const force = 1600 / (distSq + 600);
           // Repulsión radial + remolino tangencial (-uy, ux)
           fx += (ux - uy * 0.45) * force;
           fy += (uy + ux * 0.45) * force;
@@ -113,12 +123,12 @@ export const ConcreteShaderCanvas = () => {
         const totalVx = p.speedX + p.vx;
         const totalVy = p.speedY + p.vy;
         ctx.beginPath();
-        ctx.moveTo(p.x - totalVx * 5, p.y - totalVy * 5);
+        ctx.moveTo(p.x - totalVx * 12, p.y - totalVy * 12);
         ctx.lineTo(p.x, p.y);
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = p.size * 0.85;
+        ctx.lineWidth = p.size * 0.9;
         ctx.lineCap = 'round';
-        ctx.globalAlpha = p.opacity * 0.65;
+        ctx.globalAlpha = Math.min(0.85, p.opacity * 0.8);
         ctx.stroke();
 
         ctx.beginPath();
@@ -157,7 +167,7 @@ export const ConcreteShaderCanvas = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-[25] opacity-90"
+      className="fixed inset-0 pointer-events-none z-[30] opacity-95"
     />
   );
 };

@@ -32,6 +32,7 @@ import 'yet-another-react-lightbox/styles.css';
 import { CrossStitchViewerModal } from '../components/CrossStitchViewerModal';
 import { WorkshopHUDModal } from '../components/WorkshopHUDModal';
 import { AuthenticityModal } from '../components/AuthenticityModal';
+import { launchCartBezierFlight } from '../components/ProductCard';
 
 export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) => {
   const { addToCart, showToast, toggleWishlist, isInWishlist } = useCart();
@@ -96,16 +97,22 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
     };
   }, [product]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e) => {
     if (isSoldOut) {
       setIsRestockOpen(true);
       return;
     }
-    addToCart(
-      { ...product, price: product.price },
-      quantity,
-      { tier: 'finished', tierLabel: 'Coleccionable Terminado (Hecho a mano)' }
-    );
+    const triggerAdd = () =>
+      addToCart(
+        { ...product, price: product.price },
+        quantity,
+        { tier: 'finished', tierLabel: 'Coleccionable Terminado (Hecho a mano)' }
+      );
+    if (e?.currentTarget) {
+      launchCartBezierFlight(e.currentTarget, triggerAdd);
+    } else {
+      triggerAdd();
+    }
   };
 
   const handleDownload = () => {
