@@ -83,6 +83,11 @@ function playRadarChime() {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.5);
+    setTimeout(() => {
+      try {
+        ctx.close();
+      } catch {}
+    }, 600);
   } catch (e) {}
 }
 
@@ -324,8 +329,11 @@ export function AdminPage({ onBackToShop }) {
     const targetOrder = orders.find((o) => String(o.id) === String(orderId));
     setUpdatingOrderId(orderId);
     try {
-      const updatedFromBackend = await verifyOrderDeposit(orderId, { action: act });
-      await verifyOrderDepositInFirestore(orderId, act);
+      const [backendRes] = await Promise.allSettled([
+        verifyOrderDeposit(orderId, { action: act }),
+        verifyOrderDepositInFirestore(orderId, act),
+      ]);
+      const updatedFromBackend = backendRes.status === 'fulfilled' ? backendRes.value : null;
 
       const nowIso = updatedFromBackend?.queuedAt || new Date().toISOString();
       const nextStatus = act === 'CONFIRM' ? 'EN_COLA' : 'ESPERANDO_PAGO';
@@ -422,12 +430,14 @@ export function AdminPage({ onBackToShop }) {
       onConfirm: async () => {
         closeConfirm();
         try {
-          await deleteOrderApi(orderId);
-          await deleteOrderInFirestore(orderId);
           setOrders((prev) => prev.filter((o) => String(o.id) !== String(orderId)));
           if (selectedOrderDetail && String(selectedOrderDetail.id) === String(orderId)) {
             setSelectedOrderDetail(null);
           }
+          await Promise.allSettled([
+            deleteOrderInFirestore(orderId),
+            deleteOrderApi(orderId),
+          ]);
           toast.success(`Orden #${orderId} eliminada correctamente.`);
         } catch (err) {
           console.error('[AdminPage Delete Order Error]', err);
@@ -449,10 +459,12 @@ export function AdminPage({ onBackToShop }) {
         closeConfirm();
         try {
           const allIds = orders.map((o) => o.id);
-          await clearAllOrdersInFirestore(allIds);
-          await clearAllOrdersApi();
           setOrders([]);
           setSelectedOrderDetail(null);
+          await Promise.allSettled([
+            clearAllOrdersInFirestore(allIds),
+            clearAllOrdersApi(),
+          ]);
           toast.success('Todas las órdenes han sido eliminadas. Sistema en ceros.');
         } catch (err) {
           console.error('[AdminPage Clear All Error]', err);
@@ -596,9 +608,9 @@ export function AdminPage({ onBackToShop }) {
         destacado: true
       };
 
-      // 4. Guardado en Firestore + sincronización de stock/precio en Backend SQLite
+      // 4. Guardado en Firestore + sincronización de stock/precio en Backend SQLite en paralelo
       await saveProductInFirestore(payload);
-      await syncProductToBackendApi(payload);
+      syncProductToBackendApi(payload).catch(() => {});
       toast.success(`¡Pieza "${payload.title}" guardada exitosamente!`);
 
       // Actualizar estado en UI reactiva

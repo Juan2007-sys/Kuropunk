@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { CartProvider, useCart } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
@@ -10,8 +10,6 @@ import { HomePage } from './pages/HomePage';
 import { ShopPage } from './pages/ShopPage';
 import { AdminGuard } from './guards/AdminGuard';
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from './data/products';
-import { AnimatePresence, motion } from 'framer-motion';
-import Lenis from 'lenis';
 import { Toaster, toast } from 'sonner';
 import { subscribeToOrderById } from './services/firebase';
 import { trackOrder, getProductById } from './services/api';
@@ -89,16 +87,16 @@ export function AppContent() {
   const [depositNoticeBanner, setDepositNoticeBanner] = useState(null);
   const { setIsCartOpen } = useCart();
   const { currentUser, isAdmin } = useAuth();
+  const currentViewRef = useRef(currentView);
+  currentViewRef.current = currentView;
 
   // Suscripción global para avisar al cliente en tiempo real cuando el Admin acepta o rechaza su anticipo
   useEffect(() => {
-    if (currentView === 'admin') return;
-
     let activeUnsub = () => {};
     let currentWatchedId = null;
 
     const checkAndNotify = (orderData) => {
-      if (!orderData?.id) return;
+      if (!orderData?.id || currentViewRef.current === 'admin') return;
       const paySt = String(orderData.paymentStatus || '').toUpperCase();
       if (paySt !== 'ANTICIPO_VERIFICADO' && paySt !== 'RECHAZADO') return;
 
@@ -124,6 +122,7 @@ export function AppContent() {
     };
 
     const syncWatcher = async () => {
+      if (currentViewRef.current === 'admin') return;
       try {
         const lastRaw = localStorage.getItem('kuropunk_last_order');
         if (!lastRaw) return;
@@ -156,7 +155,7 @@ export function AppContent() {
       activeUnsub();
       clearInterval(intervalId);
     };
-  }, [currentView]);
+  }, []);
 
   // Navegación sincronizada con el historial nativo del navegador (PushState + Hash)
   const navigateTo = useCallback((view, product = null, replace = false) => {
@@ -229,41 +228,6 @@ export function AppContent() {
 
   // RBAC Guard is handled gracefully by AdminGuard component at render time
 
-  // Initialize Lenis Smooth Scrolling (solo en Desktop con puntero fino para evitar lag táctil)
-  useEffect(() => {
-    const isTouch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-    if (isTouch) return; // Mantiene el desplazamiento a 120Hz nativo de celulares
-
-    const lenis = new Lenis({
-      duration: 1.1,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-      wheelMultiplier: 0.9,
-      prevent: (node) => {
-        return (
-          node.hasAttribute('data-lenis-prevent') ||
-          Boolean(
-            node.closest(
-              '[data-lenis-prevent], [role="dialog"], [role="listbox"], [cmdk-list], [cmdk-root], .overflow-y-auto, .overflow-auto'
-            )
-          )
-        );
-      }
-    });
-
-    let animationFrameId;
-    function raf(time) {
-      lenis.raf(time);
-      animationFrameId = requestAnimationFrame(raf);
-    }
-    animationFrameId = requestAnimationFrame(raf);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      lenis.destroy();
-    };
-  }, []);
-
   // Atajo global Ctrl+K / Cmd+K para abrir/cerrar buscador boveda
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -276,31 +240,26 @@ export function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Bloquear scroll de fondo cuando cualquier modal esté activo
+  // Bloquear scroll de fondo cuando cualquier modal esté activo y restaurar siempre limpio al cerrar
   const anyModalOpen = isCommandOpen || isTrackingOpen || isAuthOpen || isWorkshopHUDOpen || isAuthenticityOpen;
   useEffect(() => {
     if (anyModalOpen) {
-      const prevOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = prevOverflow;
-      };
+    } else {
+      document.body.style.overflow = '';
     }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [anyModalOpen]);
 
-  // Scroll to top when view changes
+  // Scroll instantáneo al tope al cambiar de vista (sin bloqueo ni pelea con el wheel del mouse)
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo(0, 0);
   }, [currentView]);
 
   const handleSelectProduct = (product) => {
     navigateTo('product-detail', product);
-  };
-
-  const pageVariants = {
-    initial: { opacity: 0, y: 12 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } },
-    exit: { opacity: 0, y: -12, transition: { duration: 0.25, ease: 'easeIn' } }
   };
 
   return (
@@ -422,77 +381,59 @@ export function AppContent() {
       <Toast />
       <Toaster position="bottom-right" theme="dark" richColors />
 
-      {/* 6. Main Routed Screen with Framer Motion Page Transitions & Suspense */}
+      {/* 6. Main Routed Screen (respuesta instantánea sin bloqueo de AnimatePresence mode="wait") */}
       <main className="flex-grow pt-20 sm:pt-24 relative z-10">
         <Suspense fallback={<PageLoadingFallback />}>
-          <AnimatePresence mode="wait">
-            {currentView === 'home' && (
-              <motion.div key="home" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <HomePage
-                  setCurrentView={navigateTo}
-                  onSelectProduct={handleSelectProduct}
-                />
-              </motion.div>
-            )}
+          {currentView === 'home' && (
+            <HomePage
+              setCurrentView={navigateTo}
+              onSelectProduct={handleSelectProduct}
+            />
+          )}
 
-            {currentView === 'shop' && (
-              <motion.div key="shop" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <ShopPage
-                  onSelectProduct={handleSelectProduct}
-                />
-              </motion.div>
-            )}
+          {currentView === 'shop' && (
+            <ShopPage
+              onSelectProduct={handleSelectProduct}
+            />
+          )}
 
-            {currentView === 'product-detail' && (
-              <motion.div key="product-detail" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <ProductDetailPage
-                  product={selectedProduct}
-                  onSelectProduct={handleSelectProduct}
-                  onBackToShop={navigateBack}
-                />
-              </motion.div>
-            )}
+          {currentView === 'product-detail' && (
+            <ProductDetailPage
+              product={selectedProduct}
+              onSelectProduct={handleSelectProduct}
+              onBackToShop={navigateBack}
+            />
+          )}
 
-            {currentView === 'about' && (
-              <motion.div key="about" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <OurStoryPage
-                  setCurrentView={navigateTo}
-                />
-              </motion.div>
-            )}
+          {currentView === 'about' && (
+            <OurStoryPage
+              setCurrentView={navigateTo}
+            />
+          )}
 
-            {currentView === 'contact' && (
-              <motion.div key="contact" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <ContactPage />
-              </motion.div>
-            )}
+          {currentView === 'contact' && (
+            <ContactPage />
+          )}
 
-            {currentView === 'checkout' && (
-              <motion.div key="checkout" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <CheckoutPage
-                  onBackToShop={navigateBack}
-                  onOpenTracking={() => setIsTrackingOpen(true)}
-                />
-              </motion.div>
-            )}
+          {currentView === 'checkout' && (
+            <CheckoutPage
+              onBackToShop={navigateBack}
+              onOpenTracking={() => setIsTrackingOpen(true)}
+            />
+          )}
 
-            {currentView === 'my-orders' && (
-              <motion.div key="my-orders" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <MyOrdersPage
-                  onBackToShop={navigateBack}
-                  onSelectOrderForTracking={() => setIsTrackingOpen(true)}
-                />
-              </motion.div>
-            )}
+          {currentView === 'my-orders' && (
+            <MyOrdersPage
+              onBackToShop={navigateBack}
+              onSelectOrderForTracking={() => setIsTrackingOpen(true)}
+            />
+          )}
 
-            {currentView === 'admin' && (
-              <motion.div key="admin" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-                <AdminGuard onBackToShop={navigateBack}>
-                  <AdminPage onBackToShop={navigateBack} />
-                </AdminGuard>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {currentView === 'admin' && (
+            <AdminGuard onBackToShop={navigateBack}>
+              <AdminPage onBackToShop={navigateBack} />
+            </AdminGuard>
+          )}
         </Suspense>
       </main>
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Command } from 'cmdk';
-import Lenis from 'lenis';
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 import { Search, ShoppingBag, ArrowRight, Layers, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,58 +8,6 @@ import { formatCOP } from '../utils/formatters';
 export const CommandPalette = ({ isOpen, setIsOpen, onSelectProduct, setCurrentView, onOpenCart }) => {
   const [search, setSearch] = useState('');
   const listRef = useRef(null);
-  const lenisRef = useRef(null);
-
-  // Lock body scroll while CommandPalette is open
-  useEffect(() => {
-    if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [isOpen]);
-
-  // Dedicated buttery-smooth Lenis scroll for the results list
-  useEffect(() => {
-    if (!isOpen || !listRef.current) return;
-    const isTouch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
-    if (isTouch) return; // Dispositivos móviles conservan scroll inercial nativo táctil de 120Hz
-
-    const listEl = listRef.current;
-    const modalLenis = new Lenis({
-      wrapper: listEl,
-      content: listEl.firstElementChild || listEl,
-      duration: 0.85,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-      wheelMultiplier: 1.0,
-      syncTouch: false,
-    });
-    lenisRef.current = modalLenis;
-
-    let rafId;
-    function raf(time) {
-      modalLenis.raf(time);
-      rafId = requestAnimationFrame(raf);
-    }
-    rafId = requestAnimationFrame(raf);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      modalLenis.destroy();
-      lenisRef.current = null;
-    };
-  }, [isOpen]);
-
-  // Recalculate Lenis scroll dimensions when filtered search items change
-  useEffect(() => {
-    if (lenisRef.current) {
-      requestAnimationFrame(() => {
-        lenisRef.current?.resize();
-      });
-    }
-  }, [search]);
 
   // Handle Escape key to close modal
   useEffect(() => {

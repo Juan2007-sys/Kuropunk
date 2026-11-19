@@ -18,7 +18,7 @@ const ALL_LOCAL_PRODUCTS = [...PRODUCTS, ...PUNTO_CRUZ_PRODUCTS, ...PATRONES_PRO
  * Helper to fetch with timeout and fallback
  */
 async function fetchWithFallback(url, options = {}, fallbackFn) {
-  const { timeoutMs = 12000, ...fetchOptions } = options;
+  const { timeoutMs = 3500, ...fetchOptions } = options;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -297,7 +297,7 @@ export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
   const act = String(action || '').toUpperCase();
   const authHeaders = await getAdminAuthHeaders();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
   try {
     const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/verify-deposit`, {
       method: 'PATCH',
@@ -349,22 +349,30 @@ export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
  */
 export async function updateOrderStatusApi(orderId, status) {
   const authHeaders = await getAdminAuthHeaders();
-  const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-    },
-    body: JSON.stringify({ status: String(status || '').toUpperCase() }),
-  });
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody?.error?.message || errBody?.message || `Error HTTP ${res.status}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify({ status: String(status || '').toUpperCase() }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error?.message || errBody?.message || `Error HTTP ${res.status}`);
+    }
+    const json = await res.json().catch(() => ({}));
+    const updated = json.data !== undefined ? json.data : json;
+    syncOrderToLocalCache(updated);
+    return updated;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  const json = await res.json().catch(() => ({}));
-  const updated = json.data !== undefined ? json.data : json;
-  syncOrderToLocalCache(updated);
-  return updated;
 }
 
 /**
@@ -391,28 +399,44 @@ export async function getAllOrders() {
 
 export async function deleteOrderApi(orderId) {
   const authHeaders = await getAdminAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
-    method: 'DELETE',
-    headers: authHeaders,
-  });
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Error HTTP ${response.status} al eliminar orden`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/orders/${encodeURIComponent(orderId)}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok && response.status !== 404) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(errBody.message || `Error HTTP ${response.status} al eliminar orden`);
+    }
+    return response.json().catch(() => ({ success: true, id: orderId }));
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return response.json().catch(() => ({ success: true, id: orderId }));
 }
 
 export async function clearAllOrdersApi() {
   const authHeaders = await getAdminAuthHeaders();
-  const response = await fetch(`${API_BASE_URL}/orders`, {
-    method: 'DELETE',
-    headers: authHeaders,
-  });
-  if (!response.ok) {
-    const errBody = await response.json().catch(() => ({}));
-    throw new Error(errBody.message || `Error HTTP ${response.status} al vaciar órdenes`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'DELETE',
+      headers: authHeaders,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(errBody.message || `Error HTTP ${response.status} al vaciar órdenes`);
+    }
+    return response.json().catch(() => ({ success: true }));
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return response.json().catch(() => ({ success: true }));
 }
 
 export async function syncProductToBackendApi(productData) {
@@ -428,6 +452,8 @@ export async function syncProductToBackendApi(productData) {
     isActive: productData.isActive !== false,
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
   try {
     const patchRes = await fetch(`${API_BASE_URL}/products/${encodeURIComponent(productData.id)}`, {
       method: 'PATCH',
@@ -436,9 +462,11 @@ export async function syncProductToBackendApi(productData) {
         ...authHeaders,
       },
       body: JSON.stringify(updatePayload),
+      signal: controller.signal,
     });
 
     if (patchRes.ok) {
+      clearTimeout(timeoutId);
       return await patchRes.json().catch(() => null);
     }
 
@@ -455,13 +483,17 @@ export async function syncProductToBackendApi(productData) {
           sku: String(productData.sku || productData.slug || productData.id).toUpperCase(),
           category: productData.category || 'Amigurumis',
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (createRes.ok) {
         return await createRes.json().catch(() => null);
       }
     }
   } catch (e) {
     console.warn('[API syncProductToBackend warning]', e);
+  } finally {
+    clearTimeout(timeoutId);
   }
   return null;
 }

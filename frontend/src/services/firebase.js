@@ -548,11 +548,14 @@ export async function updateOrderStatusInFirestore(orderId, newStatus, extraFiel
   if (!isFirebaseConfigured) return true;
   try {
     const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, {
-      status: newStatus,
-      ...extraFields,
-      updatedAt: serverTimestamp()
-    });
+    await Promise.race([
+      updateDoc(orderRef, {
+        status: newStatus,
+        ...extraFields,
+        updatedAt: serverTimestamp()
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500))
+    ]);
   } catch {}
   return true;
 }
@@ -604,7 +607,10 @@ export async function deleteOrderInFirestore(orderId) {
   if (isFirebaseConfigured) {
     try {
       const docRef = doc(db, 'orders', String(orderId));
-      await deleteDoc(docRef);
+      await Promise.race([
+        deleteDoc(docRef),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 3500))
+      ]);
       return true;
     } catch (e) {
       console.warn('Error eliminando orden de Firestore:', orderId, e);
@@ -623,15 +629,13 @@ export async function clearAllOrdersInFirestore(orderIds = []) {
     localStorage.removeItem('kuropunk_last_order');
   } catch {}
 
-  if (isFirebaseConfigured && Array.isArray(orderIds)) {
-    for (const id of orderIds) {
-      try {
-        const docRef = doc(db, 'orders', String(id));
-        await deleteDoc(docRef);
-      } catch (e) {
-        console.warn('Error eliminando orden de Firestore:', id, e);
-      }
-    }
+  if (isFirebaseConfigured && Array.isArray(orderIds) && orderIds.length > 0) {
+    await Promise.race([
+      Promise.allSettled(
+        orderIds.map((id) => deleteDoc(doc(db, 'orders', String(id))))
+      ),
+      new Promise((resolve) => setTimeout(resolve, 4000))
+    ]);
   }
 }
 
