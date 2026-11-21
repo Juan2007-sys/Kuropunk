@@ -8,7 +8,7 @@ export const OurStoryPage = ({ setCurrentView }) => {
       {/* Background Image with Heavy Dark Overlay */}
       <div className="absolute inset-0 z-0">
         <div
-          className="w-full h-full bg-cover bg-center absolute inset-0 opacity-40 mix-blend-luminosity"
+          className="w-full h-full bg-cover bg-center absolute inset-0 opacity-35 grayscale"
           style={{
             backgroundImage: `url('https://lh3.googleusercontent.com/aida/AEtjO1VX8kvNcaBj_IY_XSbB3o8TLxQ7aFCLaETCg8PeOOnAGDXO2L5VSmsEWttvd64nVvcSaSHiBk71G7Y43I89dsXld2Mf90FRVN1EtNsLi5kMTu0Xl6zP9bFN3bZ_z9tiTdpDoUbAMrjLpOXLqM29_7hCIvCpb9fy5FvgV7_HkJwahVCMsa1OsJk1wle9AnVdF9WVCZJgmhcBE_m79QZ9N80A0IZM6NfxHCaz4a2BzU-jcA6uw19SRDcmig')`
           }}
@@ -65,7 +65,7 @@ export const OurStoryPage = ({ setCurrentView }) => {
             transition={{ duration: 0.6 }}
             className="lg:col-span-6 space-y-8 relative"
           >
-            <div className="relative z-10 p-6 sm:p-8 bg-[#211f1f]/80 backdrop-blur-md border border-[#5e3f3c] shadow-2xl space-y-6">
+            <div className="relative z-10 p-6 sm:p-8 bg-[#211f1f]/95 border border-[#5e3f3c] shadow-2xl space-y-6">
               <p className="font-body-lg text-lg text-[#e6e1e1] leading-relaxed font-medium">
                 KuroPunk no nació en una mercería convencional. Fue forjado en el asfalto urbano, donde el hilo de alta resistencia se unió con manos incansables. Entendemos el amigurumi japonés no como simples muñecos decorativos, sino como una declaración de cultura callejera: criaturas, personajes underground y piezas mecánicas nacidas de hebras continuas.
               </p>

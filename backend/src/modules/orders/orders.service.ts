@@ -171,8 +171,8 @@ export class OrdersService {
         let paymentReportedAt: Date | null = null;
 
         if (requiresDeposit) {
-          // Anticipo exacto del 20% sin pesos aleatorios adicionales
-          depositBaseAmount = Math.ceil(total * 0.20);
+          // Anticipo exacto del 50% sin pesos aleatorios adicionales
+          depositBaseAmount = Math.ceil(total * 0.50);
           depositRequiredAmount = depositBaseAmount;
           remainingBalance = total - depositBaseAmount;
           queuedAt = null; // No entra a la cola hasta verificar el anticipo
@@ -261,7 +261,7 @@ export class OrdersService {
   }
 
   /**
-   * Cliente reporta el número de comprobante / referencia de transferencia del anticipo del 20%
+   * Cliente reporta el número de comprobante / referencia de transferencia del anticipo del 50%
    */
   async reportPayment(orderId: string, dto: ReportPaymentDto): Promise<OrderEntity> {
     const cleanRef = (dto.paymentReference || '').trim().toUpperCase();

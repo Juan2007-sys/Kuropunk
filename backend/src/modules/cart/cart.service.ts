@@ -62,7 +62,7 @@ export class CartService {
     const shippingCost = 0; // Entrega personal acordada en Colombia
     const total = subtotal + shippingCost;
     const requiresDeposit = total >= 50000;
-    const depositRequiredAmount = requiresDeposit ? Math.ceil(total * 0.20) : 0;
+    const depositRequiredAmount = requiresDeposit ? Math.ceil(total * 0.50) : 0;
 
     return {
       items: validatedItems,

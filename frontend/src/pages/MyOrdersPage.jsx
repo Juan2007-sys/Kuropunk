@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const STATUS_STEPS = [
-  { key: 'esperando_pago', label: '1. Anticipo 20%', icon: Clock, desc: 'Reserva para órdenes >= $50k' },
+  { key: 'esperando_pago', label: '1. Anticipo 50%', icon: Clock, desc: 'Reserva para órdenes >= $50k' },
   { key: 'en_cola', label: '2. En Cola Oficial', icon: CheckCircle, desc: 'Anticipo validado / Turno asignado' },
   { key: 'in_production', label: '3. En Taller', icon: Hammer, desc: 'Tejiendo y ensamblando' },
   { key: 'shipped', label: '4. En Ruta', icon: Truck, desc: 'Entrega personal en camino' },
@@ -167,7 +167,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                         ¡Pago Aceptado! Tu pedido ya está en la Cola Oficial de Producción
                       </strong>
                       <span>
-                        Confirmamos la recepción de tu anticipo del 20%. El 80% restante lo pagas únicamente al recibir tu pedido en mano.
+                        Confirmamos la recepción de tu anticipo del 50%. El 50% restante lo pagas únicamente al recibir tu pedido en mano.
                       </span>
                     </div>
                   </div>
@@ -314,12 +314,12 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                       </div>
                       {(order.requiresDeposit || Number(order.totalAmount || order.total) >= 50000) && (
                         <div className="flex justify-between text-[#ffb4ab]">
-                          <span>Anticipo (20%):</span>
+                          <span>Anticipo (50%):</span>
                           <span>
                             {formatCOP(
                               order.depositRequiredAmount ||
                                 order.depositBaseAmount ||
-                                Math.ceil(Number(order.totalAmount || order.total) * 0.20),
+                                Math.ceil(Number(order.totalAmount || order.total) * 0.50),
                             )}{' '}
                             ({order.paymentStatus || 'PENDIENTE'})
                           </span>
@@ -335,7 +335,7 @@ export function MyOrdersPage({ onBackToShop, onSelectOrderForTracking }) {
                               ? order.remainingBalance
                               : Number(order.totalAmount || order.total) >= 50000
                               ? Number(order.totalAmount || order.total) -
-                                Math.ceil(Number(order.totalAmount || order.total) * 0.20)
+                                Math.ceil(Number(order.totalAmount || order.total) * 0.50)
                               : order.totalAmount || order.total,
                           )}
                         </span>

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
 import { subscribeProducts } from '../services/firebase';
 import { ProductCard } from '../components/ProductCard';
-import { useCart } from '../context/CartContext';
+import { useCartActions } from '../context/CartContext';
 import { formatCOP } from '../utils/formatters';
 import { downloadPatternPDF } from '../utils/downloadPdf';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,7 +35,7 @@ export const ShopPage = ({ onSelectProduct }) => {
   // Firestore live products state
   const [firestoreProducts, setFirestoreProducts] = useState(null);
 
-  const { addToCart, showToast } = useCart();
+  const { addToCart, showToast } = useCartActions();
 
   // Subscribe to live products in Firestore
   useEffect(() => {
@@ -303,7 +303,7 @@ export const ShopPage = ({ onSelectProduct }) => {
 
             {/* Subtitle / Telemetry */}
             <div className="hidden lg:flex items-center gap-3 text-[11px] font-mono text-neutral-500 tracking-wider pb-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#FF0033] animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF0033]"></span>
               <span>KUROPUNK · ARCHIVO 2024</span>
               <span>•</span>
               <span>WORLDWIDE DISPATCH</span>
@@ -504,7 +504,7 @@ export const ShopPage = ({ onSelectProduct }) => {
 
                     {/* Image Preview */}
                     <div className="relative w-full aspect-[4/5] bg-[#141414] overflow-hidden">
-                      <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-opacity duration-500 z-10 mix-blend-screen pointer-events-none"></div>
+                      <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-colors duration-500 z-10 pointer-events-none"></div>
 
                       <img
                         src={item.image}
@@ -515,10 +515,10 @@ export const ShopPage = ({ onSelectProduct }) => {
 
                       {/* Badges */}
                       <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-20">
-                        <span className="text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 bg-neutral-900/90 text-[#ffb4ab] border border-[#5e3f3c] backdrop-blur-md">
+                        <span className="text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 bg-neutral-900/95 text-[#ffb4ab] border border-[#5e3f3c]">
                           {item.badge}
                         </span>
-                        <span className="text-[9px] font-mono tracking-wider text-neutral-400 bg-black/70 px-1.5 py-0.5 backdrop-blur-sm self-start">
+                        <span className="text-[9px] font-mono tracking-wider text-neutral-400 bg-black/85 px-1.5 py-0.5 self-start">
                           {item.gridSize}
                         </span>
                       </div>
@@ -621,7 +621,7 @@ export const ShopPage = ({ onSelectProduct }) => {
 
                     {/* Image Preview with Blueprint tag */}
                     <div className="relative w-full aspect-[4/5] bg-[#141414] overflow-hidden">
-                      <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-opacity duration-500 z-10 mix-blend-screen pointer-events-none"></div>
+                      <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-colors duration-500 z-10 pointer-events-none"></div>
 
                       <img
                         src={item.image}
@@ -632,10 +632,10 @@ export const ShopPage = ({ onSelectProduct }) => {
 
                       {/* Badges */}
                       <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-20">
-                        <span className="text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 bg-[#FF0033]/90 text-white font-bold backdrop-blur-md">
+                        <span className="text-[9px] font-mono tracking-widest uppercase px-2 py-0.5 bg-[#FF0033] text-white font-bold">
                           {item.difficulty}
                         </span>
-                        <span className="text-[9px] font-mono tracking-wider text-neutral-400 bg-black/70 px-1.5 py-0.5 backdrop-blur-sm self-start">
+                        <span className="text-[9px] font-mono tracking-wider text-neutral-400 bg-black/85 px-1.5 py-0.5 self-start">
                           {item.hookSize}
                         </span>
                       </div>

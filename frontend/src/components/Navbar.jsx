@@ -5,7 +5,7 @@ import { ShoppingCart, User, Search, Menu, X, Heart, Package, Shield, LogOut, Fi
 import { motion, AnimatePresence } from 'framer-motion';
 import logoNegro from '../assets/logo_negro.jpeg';
 
-export const Navbar = ({ 
+export const Navbar = React.memo(({ 
   currentView, 
   setCurrentView, 
   onOpenCommandPalette, 
@@ -38,7 +38,7 @@ export const Navbar = ({
   };
 
   return (
-    <header className="fixed top-0 w-full z-40 transition-colors duration-300 concrete-texture brutalist-border border-t-0 border-x-0 overflow-hidden bg-[#141313] sm:bg-[#141313]/95 sm:backdrop-blur-md shadow-xl">
+    <header className="fixed top-0 w-full z-40 transition-colors duration-300 concrete-texture brutalist-border border-t-0 border-x-0 overflow-hidden bg-[#141313]/95 shadow-xl">
       {/* Dynamic light glows (gradiente radial sin costo de blur en GPU móvil) */}
       <div
         className="absolute top-[-50px] left-[15%] w-[250px] h-[250px] rounded-full opacity-20 pointer-events-none"
@@ -397,4 +397,4 @@ export const Navbar = ({
       </AnimatePresence>
     </header>
   );
-};
+});

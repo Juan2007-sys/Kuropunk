@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -61,6 +62,13 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
   const [searchResult, setSearchResult] = useState(CERTIFICATE_VAULT['RX-00-042']);
   const [hasSearched, setHasSearched] = useState(true);
   const [isCopied, setIsCopied] = useState(false);
+  const copyTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -98,13 +106,14 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
     if (searchResult && navigator.clipboard) {
       navigator.clipboard.writeText(`CERTIFICADO KUROPUNK · SERIAL: ${searchResult.serial} - PIEZA: ${searchResult.title}`);
       setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2500);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setIsCopied(false), 2500);
     }
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto overscroll-contain">
+      <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/90 overflow-y-auto overscroll-contain">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -264,6 +273,7 @@ export const AuthenticityModal = ({ isOpen, onClose, initialSerial = '' }) => {
 
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

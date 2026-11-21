@@ -326,7 +326,7 @@ export function downloadReceiptPDF(order) {
 
   const totalNum = Number(order.total || order.totalAmount || 0);
   const requiresDeposit = order.requiresDeposit ?? totalNum >= 50000;
-  const depositAmount = Number(order.depositRequiredAmount || order.depositBaseAmount || (requiresDeposit ? Math.ceil(totalNum * 0.2) : 0));
+  const depositAmount = Number(order.depositRequiredAmount || order.depositBaseAmount || (requiresDeposit ? Math.ceil(totalNum * 0.5) : 0));
   const remainingAmount = Number(order.remainingBalance ?? Math.max(0, totalNum - depositAmount));
 
   const htmlContent = `<!DOCTYPE html>
@@ -411,8 +411,8 @@ export function downloadReceiptPDF(order) {
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #5e3f3c; text-align: right; font-size: 13px; line-height: 1.8;">
       <div>SUBTOTAL: ${escapeHtml(formatCOP(order.subtotal || totalNum))}</div>
       ${requiresDeposit ? `
-        <div style="color: #facc15;">ANTICIPO 20% (${escapeHtml(order.paymentReference || 'BRE-B')}): ${escapeHtml(formatCOP(depositAmount))}</div>
-        <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">SALDO RESTANTE CONTRAENTREGA (80%): ${escapeHtml(formatCOP(remainingAmount))}</div>
+        <div style="color: #facc15;">ANTICIPO 50% (${escapeHtml(order.paymentReference || 'BRE-B')}): ${escapeHtml(formatCOP(depositAmount))}</div>
+        <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">SALDO RESTANTE CONTRAENTREGA (50%): ${escapeHtml(formatCOP(remainingAmount))}</div>
       ` : `
         <div style="font-size: 18px; font-weight: bold; color: #ffb4ab;">TOTAL A PAGAR AL RECIBIR: ${escapeHtml(formatCOP(totalNum))}</div>
       `}

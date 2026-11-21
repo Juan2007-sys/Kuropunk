@@ -30,7 +30,7 @@ export function ConfirmModal({
   return (
     <AnimatePresence>
       <div 
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 animate-fade-in"
         onClick={(e) => {
           if (e.target === e.currentTarget && !isLoading) onClose();
         }}

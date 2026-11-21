@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   auth,
   googleProvider,
@@ -29,15 +29,18 @@ export function AuthProvider({ children }) {
     } catch {}
 
     let unsubscribe = () => {};
+    let isMounted = true;
 
     try {
       unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!isMounted) return;
         if (firebaseUser) {
           try {
             const profile = await syncUserProfile(firebaseUser);
             const role = await getUserRole(firebaseUser);
+            if (!isMounted) return;
             const isAdminRole = role === 'admin';
-            
+
             setUserRole(role);
             setCurrentUser({
               uid: firebaseUser.uid,
@@ -49,6 +52,7 @@ export function AuthProvider({ children }) {
               isAdmin: isAdminRole
             });
           } catch (profileErr) {
+            if (!isMounted) return;
             console.warn('[KuroPunk Auth] Error al sincronizar perfil o rol:', profileErr);
             setUserRole('customer');
             setCurrentUser({
@@ -65,7 +69,7 @@ export function AuthProvider({ children }) {
           setCurrentUser(null);
           setUserRole('customer');
         }
-        setLoading(false);
+        if (isMounted) setLoading(false);
       });
     } catch (e) {
       console.warn('Firebase Auth state listener error:', e);
@@ -74,11 +78,13 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
-  // Google Sign-In with robust configuration and explicit error handling
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = useCallback(async () => {
     try {
       googleProvider.setCustomParameters({ prompt: 'select_account' });
       const res = await signInWithPopup(auth, googleProvider);
@@ -121,10 +127,9 @@ export function AuthProvider({ children }) {
       }
       throw error;
     }
-  };
+  }, []);
 
-  // Email / Password Login (Zero-Trust: Verifica credenciales reales en Firebase Auth)
-  const loginWithEmail = async (email, password) => {
+  const loginWithEmail = useCallback(async (email, password) => {
     const cleanEmail = (email || '').trim().toLowerCase();
 
     if (!cleanEmail || !password) {
@@ -152,10 +157,9 @@ export function AuthProvider({ children }) {
       console.error('[KuroPunk Auth] Email sign-in failed:', error);
       throw error;
     }
-  };
+  }, []);
 
-  // Email / Password Registration
-  const registerWithEmail = async (email, password, displayName, phoneNumber) => {
+  const registerWithEmail = useCallback(async (email, password, displayName, phoneNumber) => {
     try {
       const res = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(res.user, { displayName });
@@ -175,10 +179,9 @@ export function AuthProvider({ children }) {
       console.error('[KuroPunk Auth] Registration failed:', error);
       throw error;
     }
-  };
+  }, []);
 
-  // Total Logout: signs out, purges all stored tokens/caches, resets state to null/customer
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch (e) {
@@ -188,12 +191,14 @@ export function AuthProvider({ children }) {
     sessionStorage.clear();
     setCurrentUser(null);
     setUserRole('customer');
-  };
+  }, []);
 
-  const value = {
+  const isAdmin = Boolean(currentUser && userRole === 'admin');
+
+  const value = useMemo(() => ({
     currentUser,
     userRole,
-    isAdmin: Boolean(currentUser && userRole === 'admin'),
+    isAdmin,
     loading,
     isFirebaseConfigured,
     redirectIntent,
@@ -202,7 +207,17 @@ export function AuthProvider({ children }) {
     loginWithEmail,
     registerWithEmail,
     logout
-  };
+  }), [
+    currentUser,
+    userRole,
+    isAdmin,
+    loading,
+    redirectIntent,
+    loginWithGoogle,
+    loginWithEmail,
+    registerWithEmail,
+    logout
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

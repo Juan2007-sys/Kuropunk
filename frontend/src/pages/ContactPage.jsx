@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { useCart } from '../context/CartContext';
+import { useCartActions } from '../context/CartContext';
 import { submitContactMessage } from '../services/api';
 import { saveContactMessageInFirestore, uploadProductImage } from '../services/firebase';
 import { formatCOP, generateCustomerToAdminWhatsAppUrl, buildCustomerToAdminWhatsAppMessage } from '../utils/formatters';
@@ -49,7 +49,7 @@ const COMPLEXITY_OPTIONS = [
 ];
 
 export const ContactPage = () => {
-  const { showToast } = useCart();
+  const { showToast } = useCartActions();
 
   // Wizard Configuration State
   const [step, setStep] = useState(1); // 1: Características | 2: Referencias | 3: Datos de Contacto
@@ -61,6 +61,18 @@ export const ContactPage = () => {
   // Images state (local preview + files for upload)
   const [uploadedImages, setUploadedImages] = useState([]); // [{ file, previewUrl, remoteUrl }]
   const [uploadingImages, setUploadingImages] = useState(false);
+  const uploadedImagesRef = useRef([]);
+  uploadedImagesRef.current = uploadedImages;
+
+  useEffect(() => {
+    return () => {
+      uploadedImagesRef.current.forEach((item) => {
+        if (item?.previewUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(item.previewUrl);
+        }
+      });
+    };
+  }, []);
 
   // Customer Contact State
   const [customerData, setCustomerData] = useState({
@@ -116,7 +128,13 @@ export const ContactPage = () => {
   };
 
   const removeImage = (indexToRemove) => {
-    setUploadedImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    setUploadedImages((prev) => {
+      const target = prev[indexToRemove];
+      if (target?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter((_, idx) => idx !== indexToRemove);
+    });
   };
 
   // Submit quote to DB
@@ -196,6 +214,11 @@ export const ContactPage = () => {
   };
 
   const resetWizard = () => {
+    uploadedImagesRef.current.forEach((item) => {
+      if (item?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+    });
     setIsSent(false);
     setStep(1);
     setUploadedImages([]);
@@ -204,10 +227,16 @@ export const ContactPage = () => {
 
   return (
     <div className="w-full pt-8 pb-24 bg-[#141313] relative min-h-screen text-[#e6e1e1]">
-      {/* Background ambient lighting */}
+      {/* Background ambient lighting (gradientes radiales sin blur-3xl costoso en GPU) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-1/4 -left-20 w-[500px] h-[500px] bg-[#e0141f]/10 blur-3xl rounded-full"></div>
-        <div className="absolute bottom-1/4 right-0 w-[600px] h-[600px] bg-[#e0141f]/08 blur-3xl rounded-full"></div>
+        <div
+          className="absolute top-1/4 -left-20 w-[500px] h-[500px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(224,20,31,0.12) 0%, transparent 70%)' }}
+        ></div>
+        <div
+          className="absolute bottom-1/4 right-0 w-[600px] h-[600px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(224,20,31,0.10) 0%, transparent 70%)' }}
+        ></div>
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-8 md:px-16 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start mt-6">

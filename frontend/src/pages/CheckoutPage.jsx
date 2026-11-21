@@ -8,7 +8,7 @@ import {
   compressImageToDataUrl,
   subscribeToOrderById,
 } from '../services/firebase';
-import { DEPOSIT_THRESHOLD_COP, PAYMENT_ACCOUNTS } from '../config/paymentConfig';
+import { DEPOSIT_THRESHOLD_COP, DEPOSIT_PERCENTAGE, PAYMENT_ACCOUNTS } from '../config/paymentConfig';
 import { AuthGuard } from '../guards/AuthGuard';
 import { downloadReceiptPDF } from '../utils/downloadPdf';
 import { formatCOP, generateWhatsAppOrderUrl, buildWhatsAppOrderMessage } from '../utils/formatters';
@@ -74,10 +74,10 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
   const shippingCost = 0;
   const grandTotal = useMemo(() => subtotal, [subtotal]);
 
-  // Regla de los $50.000 COP: >= $50.000 requiere anticipo obligatorio del 20%
+  // Regla de los $50.000 COP: >= $50.000 requiere anticipo obligatorio del 50%
   const requiresDeposit = useMemo(() => grandTotal >= DEPOSIT_THRESHOLD_COP, [grandTotal]);
   const depositBaseAmount = useMemo(
-    () => (requiresDeposit ? Math.ceil(grandTotal * 0.20) : 0),
+    () => (requiresDeposit ? Math.ceil(grandTotal * DEPOSIT_PERCENTAGE) : 0),
     [requiresDeposit, grandTotal],
   );
   const remainingBalance = useMemo(
@@ -91,6 +91,18 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
   const [proofPreview, setProofPreview] = useState('');
   const [proofError, setProofError] = useState(false);
   const [isReportingPayment, setIsReportingPayment] = useState(false);
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
+  const proofPreviewRef = useRef('');
+  proofPreviewRef.current = proofPreview;
+
+  React.useEffect(() => {
+    return () => {
+      if (proofPreviewRef.current && proofPreviewRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(proofPreviewRef.current);
+      }
+    };
+  }, []);
 
   const cleanPhoneDigits = useMemo(
     () => (customerInfo.phone || '').replace(/\D/g, '').replace(/^57(?=\d{10}$)/, '').slice(0, 10),
@@ -125,7 +137,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
             colors: ['#25D366', '#ffb4ab', '#ffffff'],
           });
         } catch {}
-        showToast("¡ANTICIPO ACEPTADO! TU PEDIDO YA ESTÁ EN LA COLA OFICIAL DE PRODUCCIÓN", "success");
+        showToastRef.current("¡ANTICIPO ACEPTADO! TU PEDIDO YA ESTÁ EN LA COLA OFICIAL DE PRODUCCIÓN", "success");
       } else if (nextPayStatus === 'RECHAZADO') {
         setOrderConfirmed((prev) =>
           prev && prev.paymentStatus !== 'RECHAZADO'
@@ -136,7 +148,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
               }
             : prev,
         );
-        showToast("EL COMPROBANTE FUE RECHAZADO POR EL TALLER. REVISA EL RASTREO DE TU PEDIDO", "error");
+        showToastRef.current("EL COMPROBANTE FUE RECHAZADO POR EL TALLER. REVISA EL RASTREO DE TU PEDIDO", "error");
       }
     };
 
@@ -153,7 +165,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
       unsub();
       clearInterval(pollInterval);
     };
-  }, [orderConfirmed?.id, orderConfirmed?.status, showToast]);
+  }, [orderConfirmed?.id, orderConfirmed?.status]);
 
   const handleInputChange = useCallback((field, value) => {
     if (field === 'phone') {
@@ -265,7 +277,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
     const validated = validateCheckoutInputs();
     if (!validated) return;
 
-    // Si el pedido es >= $50.000 COP, NO agendamos nada todavía: mostramos el aviso del anticipo del 20%
+    // Si el pedido es >= $50.000 COP, NO agendamos nada todavía: mostramos el aviso del anticipo del 50%
     if (requiresDeposit) {
       setShowDepositNotice(true);
       return;
@@ -501,12 +513,12 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
             </div>
           </div>
 
-          {/* Modal Aviso Obligatorio de Anticipo (20%) antes de ir a pagar */}
+          {/* Modal Aviso Obligatorio de Anticipo (50%) antes de ir a pagar */}
           {showDepositNotice && !orderConfirmed && (
             <div
               role="dialog"
               aria-modal="true"
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: 8 }}
@@ -525,22 +537,22 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                         Anticipo requerido · Pedidos desde $50.000
                       </span>
                       <h2 className="font-headline-md text-2xl uppercase text-white leading-tight">
-                        Tu pedido requiere abono del 20%
+                        Tu pedido requiere abono del 50%
                       </h2>
                     </div>
                   </div>
 
                   <p className="text-sm text-neutral-300 leading-relaxed">
-                    Como tu compra suma <strong className="text-white">{formatCOP(grandTotal)}</strong>, te pedimos un anticipo del 20% para iniciar el tejido. El saldo restante lo pagas cuando recibas tu pieza.
+                    Como tu compra suma <strong className="text-white">{formatCOP(grandTotal)}</strong>, te pedimos un anticipo del 50% para iniciar el tejido. El saldo restante lo pagas cuando recibas tu pieza.
                   </p>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3.5 bg-[#111010] border border-[#e0141f]/50">
-                      <span className="font-mono text-[10px] uppercase text-[#ffb4ab] block">Anticipo hoy (20%)</span>
+                      <span className="font-mono text-[10px] uppercase text-[#ffb4ab] block">Anticipo hoy (50%)</span>
                       <strong className="font-mono text-lg text-white">{formatCOP(depositBaseAmount)}</strong>
                     </div>
                     <div className="p-3.5 bg-[#111010] border border-emerald-700/50">
-                      <span className="font-mono text-[10px] uppercase text-emerald-400 block">Al entregar (80%)</span>
+                      <span className="font-mono text-[10px] uppercase text-emerald-400 block">Al entregar (50%)</span>
                       <strong className="font-mono text-lg text-emerald-400">{formatCOP(remainingBalance)}</strong>
                     </div>
                   </div>
@@ -573,7 +585,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
 
           {/* Pantalla Post-Confirmación, Pantalla de Pago de Anticipo o Formulario de Checkout */}
           {depositDraft && !orderConfirmed ? (
-            /* PANTALLA DE PAGO DEL ANTICIPO OBLIGATORIO (20%) - ANTES DE CREAR LA ORDEN */
+            /* PANTALLA DE PAGO DEL ANTICIPO OBLIGATORIO (50%) - ANTES DE CREAR LA ORDEN */
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -582,7 +594,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#5e3f3c] pb-4">
                 <div className="inline-flex items-center gap-2 bg-[#e0141f] text-white font-mono font-bold text-xs px-3 py-1 uppercase tracking-wider">
                   <Lock className="w-3.5 h-3.5" />
-                  <span>PAGO DE ANTICIPO (20%) · SIN AGENDAR AÚN</span>
+                  <span>PAGO DE ANTICIPO (50%) · SIN AGENDAR AÚN</span>
                 </div>
                 <button
                   type="button"
@@ -599,16 +611,16 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                   Realiza tu Anticipo y Anexa el Comprobante
                 </h1>
                 <p className="font-mono text-xs sm:text-sm text-neutral-300 leading-relaxed">
-                  Transfiere el <strong className="text-[#ffb4ab]">anticipo del 20%</strong> a nuestra llave oficial y registra abajo el número o captura del comprobante para agendar oficialmente tu pedido.
+                  Transfiere el <strong className="text-[#ffb4ab]">anticipo del 50%</strong> a nuestra llave oficial y registra abajo el número o captura del comprobante para agendar oficialmente tu pedido.
                 </p>
               </div>
 
-              {/* Monto Exacto del Anticipo (20% sin pesos adicionales) */}
+              {/* Monto Exacto del Anticipo (50% sin pesos adicionales) */}
               <div className="p-5 bg-[#141313] border-2 border-[#25D366] space-y-3 text-left relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <span className="font-mono text-[10px] text-[#25D366] uppercase font-bold tracking-widest block">
-                      VALOR DEL ANTICIPO (20%) A TRANSFERIR HOY:
+                      VALOR DEL ANTICIPO (50%) A TRANSFERIR HOY:
                     </span>
                     <div className="font-headline-md text-4xl sm:text-5xl text-white tracking-tight pt-1">
                       {formatCOP(depositDraft.depositBaseAmount)}
@@ -636,11 +648,11 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                     <strong className="text-white text-sm">{formatCOP(depositDraft.grandTotal)}</strong>
                   </div>
                   <div className="p-2.5 bg-[#1d1b1b] border border-[#e0141f]/50">
-                    <span className="text-[10px] text-[#ffb4ab] block uppercase">Anticipo 20% (Hoy)</span>
+                    <span className="text-[10px] text-[#ffb4ab] block uppercase">Anticipo 50% (Hoy)</span>
                     <strong className="text-[#ffb4ab] text-sm">{formatCOP(depositDraft.depositBaseAmount)}</strong>
                   </div>
                   <div className="p-2.5 bg-[#1d1b1b] border border-emerald-700/50">
-                    <span className="text-[10px] text-emerald-400 block uppercase">Saldo al Entregar (80%)</span>
+                    <span className="text-[10px] text-emerald-400 block uppercase">Saldo al Entregar (50%)</span>
                     <strong className="text-emerald-400 text-sm">{formatCOP(depositDraft.remainingBalance)}</strong>
                   </div>
                 </div>
@@ -734,6 +746,9 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                         onChange={(e) => {
                           const f = e.target.files?.[0];
                           if (f) {
+                            if (proofPreview && proofPreview.startsWith('blob:')) {
+                              URL.revokeObjectURL(proofPreview);
+                            }
                             setProofFile(f);
                             setProofPreview(URL.createObjectURL(f));
                             setProofError(false);
@@ -824,7 +839,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                   ) : orderConfirmed.paymentStatus === 'ANTICIPO_VERIFICADO' ? (
                     <p className="text-xs sm:text-sm text-emerald-300 max-w-lg mx-auto font-mono leading-relaxed">
                       ¡El taller confirmó tu anticipo de{' '}
-                      <strong className="text-white">{formatCOP(orderConfirmed.depositRequiredAmount)}</strong>! Tu muñeco ya tiene turno oficial en la cola de producción y pagas el 80% restante ({formatCOP(orderConfirmed.remainingBalance)}) al recibirlo en mano.
+                      <strong className="text-white">{formatCOP(orderConfirmed.depositRequiredAmount)}</strong>! Tu muñeco ya tiene turno oficial en la cola de producción y pagas el 50% restante ({formatCOP(orderConfirmed.remainingBalance)}) al recibirlo en mano.
                     </p>
                   ) : (
                     <p className="text-xs sm:text-sm text-neutral-300 max-w-md mx-auto">
@@ -836,15 +851,15 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                   )}
                 </div>
 
-                {/* Resumen de Saldo Pendiente (80%) */}
+                {/* Resumen de Saldo Pendiente (50%) */}
                 {orderConfirmed.requiresDeposit && (
                   <div className="p-4 bg-[#141313] border border-[#5e3f3c] grid grid-cols-2 gap-3 font-mono text-xs text-left">
                     <div>
-                      <span className="text-[10px] text-neutral-400 uppercase block">Anticipo Reportado (20%)</span>
+                      <span className="text-[10px] text-neutral-400 uppercase block">Anticipo Reportado (50%)</span>
                       <strong className="text-[#ffb4ab] text-sm">{formatCOP(orderConfirmed.depositRequiredAmount)}</strong>
                     </div>
                     <div>
-                      <span className="text-[10px] text-emerald-400 uppercase block">Saldo Restante al Entregar (80%)</span>
+                      <span className="text-[10px] text-emerald-400 uppercase block">Saldo Restante al Entregar (50%)</span>
                       <strong className="text-emerald-400 text-sm">{formatCOP(orderConfirmed.remainingBalance)}</strong>
                     </div>
                   </div>
@@ -1171,12 +1186,12 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                         <span className="text-[#ffb4ab] text-xs font-mono uppercase block mb-1 font-bold flex items-center gap-1.5">
                           <Banknote className="w-4 h-4 text-emerald-400" />
                           {requiresDeposit
-                            ? `¿Cómo deseas pagar el 80% restante (${formatCOP(remainingBalance)}) al recibir tu paquete?`
+                            ? `¿Cómo deseas pagar el 50% restante (${formatCOP(remainingBalance)}) al recibir tu paquete?`
                             : '¿Cómo deseas pagar al recibir tu paquete?'}
                         </span>
                         {requiresDeposit && (
                           <span className="text-[11px] text-neutral-400 font-mono block mb-2.5">
-                            Hoy transfieres el anticipo del 20% ({formatCOP(depositBaseAmount)}) por Llave Bre-B y el saldo lo entregas cuando tengas tu pedido en mano:
+                            Hoy transfieres el anticipo del 50% ({formatCOP(depositBaseAmount)}) por Llave Bre-B y el saldo lo entregas cuando tengas tu pedido en mano:
                           </span>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1192,7 +1207,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                           >
                             <span>💵</span>
                             <span className="text-xs font-mono">
-                              {requiresDeposit ? 'Efectivo al recibir (80% restante)' : 'Efectivo al recibir en mano'}
+                              {requiresDeposit ? 'Efectivo al recibir (50% restante)' : 'Efectivo al recibir en mano'}
                             </span>
                           </button>
 
@@ -1208,7 +1223,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                           >
                             <span>📱</span>
                             <span className="text-xs font-mono">
-                              {requiresDeposit ? 'Nequi / Daviplata al recibir (80%)' : 'Nequi / Daviplata al recibir'}
+                              {requiresDeposit ? 'Nequi / Daviplata al recibir (50%)' : 'Nequi / Daviplata al recibir'}
                             </span>
                           </button>
                         </div>
@@ -1230,10 +1245,10 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                       <div className="p-3.5 bg-amber-950/30 border-l-4 border-amber-400 border border-amber-500/40 font-mono text-xs text-amber-100 space-y-1.5">
                         <div className="font-bold text-amber-300 flex items-center gap-1.5 uppercase">
                           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                          <span>Información Importante · Anticipo del 20%</span>
+                          <span>Información Importante · Anticipo del 50%</span>
                         </div>
                         <p className="text-[11px] leading-relaxed text-neutral-200">
-                          Como tu pedido es de <strong>$50.000 COP o más</strong>, requiere un <strong>anticipo del 20% ({formatCOP(depositBaseAmount)})</strong> por Llave Bre-B y anexar la foto del comprobante para agendarlo. El <strong>80% restante ({formatCOP(remainingBalance)})</strong> lo pagas al recibir.
+                          Como tu pedido es de <strong>$50.000 COP o más</strong>, requiere un <strong>anticipo del 50% ({formatCOP(depositBaseAmount)})</strong> por Llave Bre-B y anexar la foto del comprobante para agendarlo. El <strong>50% restante ({formatCOP(remainingBalance)})</strong> lo pagas al recibir.
                         </p>
                       </div>
                     )}
@@ -1247,7 +1262,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                       {requiresDeposit ? (
                         <>
                           <div className="flex justify-between items-center p-2.5 bg-[#1d1b1b] border border-[#e0141f]/60 text-[#ffb4ab]">
-                            <span className="font-bold">Anticipo del 20% para iniciar hoy:</span>
+                            <span className="font-bold">Anticipo del 50% para iniciar hoy:</span>
                             <span className="font-bold text-base text-white">{formatCOP(depositBaseAmount)}</span>
                           </div>
                           <div className="flex justify-between items-center p-2.5 bg-[#1d1b1b] border border-emerald-700/50 text-emerald-400">
@@ -1272,7 +1287,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                     <div className="border-t border-[#5e3f3c] pt-3">
                       <div className="flex justify-between items-end">
                         <span className="font-headline-md text-lg uppercase text-white">
-                          {requiresDeposit ? 'A Transferir Hoy (20%)' : 'Total Contraentrega'}
+                          {requiresDeposit ? 'A Transferir Hoy (50%)' : 'Total Contraentrega'}
                         </span>
                         <span className="font-mono text-2xl font-bold text-[#ffb4ab]">
                           {requiresDeposit ? formatCOP(depositBaseAmount) : formatCOP(grandTotal)}
@@ -1280,7 +1295,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                       </div>
                       <p className="text-[11px] font-mono text-emerald-400 text-right mt-1">
                         {requiresDeposit
-                          ? `✓ El 80% restante (${formatCOP(remainingBalance)}) lo pagas al recibir.`
+                          ? `✓ El 50% restante (${formatCOP(remainingBalance)}) lo pagas al recibir.`
                           : '✓ 0 Cobros online. Pagas al tener la pieza en tus manos.'}
                       </p>
                     </div>
@@ -1301,7 +1316,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                         ) : (
                           <span>
                             {requiresDeposit
-                              ? 'Pagar Anticipo (20%) y Agendar'
+                              ? 'Pagar Anticipo (50%) y Agendar'
                               : 'Confirmar Pedido Contraentrega'}
                           </span>
                         )}
@@ -1326,11 +1341,11 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
 
           {/* Barra Fija Inferior en Móvil (Zona del Pulgar) */}
           {!orderConfirmed && !depositDraft && cart.length > 0 && (
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#141313]/95 backdrop-blur-md border-t border-[#5e3f3c] p-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-8px_20px_rgba(0,0,0,0.6)]">
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#141313]/95 border-t border-[#5e3f3c] p-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-8px_20px_rgba(0,0,0,0.6)]">
               <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-mono text-neutral-400 uppercase">
-                    {requiresDeposit ? 'Anticipo 20% Hoy' : 'Total Contraentrega'}
+                    {requiresDeposit ? 'Anticipo 50% Hoy' : 'Total Contraentrega'}
                   </span>
                   <span className="font-mono text-lg font-bold text-[#ffb4ab] leading-none">
                     {requiresDeposit ? formatCOP(depositBaseAmount) : formatCOP(grandTotal)}
@@ -1348,7 +1363,7 @@ export const CheckoutPage = ({ onBackToShop, onOpenTracking }) => {
                       <span>REGISTRANDO...</span>
                     </>
                   ) : (
-                    <span>{requiresDeposit ? 'Pagar Anticipo (20%)' : 'Confirmar Pedido'}</span>
+                    <span>{requiresDeposit ? 'Pagar Anticipo (50%)' : 'Confirmar Pedido'}</span>
                   )}
                 </button>
               </div>

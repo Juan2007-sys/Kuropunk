@@ -57,7 +57,7 @@ import { toast } from 'sonner';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 const ORDER_STATUS_OPTIONS = [
-  { value: 'ESPERANDO_PAGO', label: '0A. Esperando Anticipo (20%)', color: 'text-amber-400' },
+  { value: 'ESPERANDO_PAGO', label: '0A. Esperando Anticipo (50%)', color: 'text-amber-400' },
   { value: 'VERIFICANDO_ANTICIPO', label: '0B. Verificando Anticipo', color: 'text-yellow-400' },
   { value: 'EN_COLA', label: '1. En Cola Oficial (Anticipo OK)', color: 'text-emerald-400' },
   { value: 'placed', label: '1B. Creado / Placed', color: 'text-amber-400' },
@@ -139,6 +139,18 @@ export function AdminPage({ onBackToShop }) {
   const [formSizes, setFormSizes] = useState(['M']);
   const [formImages, setFormImages] = useState([]);
   const [formIsActive, setFormIsActive] = useState(true);
+  const formImagesRef = React.useRef([]);
+  formImagesRef.current = formImages;
+
+  useEffect(() => {
+    return () => {
+      formImagesRef.current.forEach((url) => {
+        if (typeof url === 'string' && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+    };
+  }, []);
 
   // Real-time Orders Subscription + Backend Sync
   useEffect(() => {
@@ -681,6 +693,11 @@ export function AdminPage({ onBackToShop }) {
   };
 
   const resetProductForm = () => {
+    formImagesRef.current.forEach((url) => {
+      if (typeof url === 'string' && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
     setEditingProduct(null);
     setSelectedFile(null);
     setFormTitle('');
@@ -776,12 +793,12 @@ export function AdminPage({ onBackToShop }) {
                 CONTROL DE ANTICIPOS Y COLA DE PRODUCCIÓN
               </h2>
               <p className="font-mono text-xs text-neutral-400">
-                Los pedidos desde $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo exacto del 20% con su comprobante.
+                Los pedidos desde $50.000 COP permanecen en Pre-Cola hasta que confirmes el ingreso del anticipo exacto del 50% con su comprobante.
               </p>
             </div>
             <div className="px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-mono text-xs flex items-center space-x-2 shrink-0">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>CANDADO ANTI-FRAUDE 20% ACTIVO</span>
+              <span>CANDADO ANTI-FRAUDE 50% ACTIVO</span>
             </div>
           </div>
 
@@ -907,7 +924,7 @@ export function AdminPage({ onBackToShop }) {
                         SECCIÓN 1 · PRE-COLA DE VALIDACIÓN FINANCIERA
                       </span>
                       <h3 className="font-headline-md text-xl sm:text-2xl text-white uppercase">
-                        POR CONFIRMAR ANTICIPO DEL 20% ({preQueueOrders.length})
+                        POR CONFIRMAR ANTICIPO DEL 50% ({preQueueOrders.length})
                       </h3>
                       <p className="font-mono text-[11px] text-neutral-400">
                         Estos pedidos son de $50.000 COP o más y NO entran a la cola de tejido hasta que verifiques el ingreso exacto en Bre-B / Nequi.
@@ -924,7 +941,7 @@ export function AdminPage({ onBackToShop }) {
                       {preQueueOrders.map((order) => {
                         const isUpdating = updatingOrderId === order.id;
                         const totalVal = Number(order.totalAmount || order.total || 0);
-                        const baseDep = Number(order.depositBaseAmount || Math.ceil(totalVal * 0.20));
+                        const baseDep = Number(order.depositBaseAmount || Math.ceil(totalVal * 0.50));
                         const exactExpected = Number(order.depositRequiredAmount || baseDep);
                         const remBal = Number(order.remainingBalance ?? (totalVal - baseDep));
                         const cleanPhone = String(order.customerData?.phone || order.phone || '').replace(/\D/g, '');
@@ -963,17 +980,17 @@ export function AdminPage({ onBackToShop }) {
                                 </span>
                               </div>
 
-                              {/* Monto del Anticipo (20%) y Referencia del Cliente */}
+                              {/* Monto del Anticipo (50%) y Referencia del Cliente */}
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-black/70 border border-amber-500/40">
                                 <div>
                                   <span className="text-[10px] text-amber-300 uppercase block font-bold">
-                                    Valor del Anticipo (20%)
+                                    Valor del Anticipo (50%)
                                   </span>
                                   <strong className="font-headline-md text-2xl sm:text-3xl text-amber-400 tracking-wider block">
                                     {formatCOP(baseDep)}
                                   </strong>
                                   <span className="text-[10px] text-neutral-400">
-                                    Total orden: {formatCOP(totalVal)} • Saldo 80%: {formatCOP(remBal)}
+                                    Total orden: {formatCOP(totalVal)} • Saldo 50%: {formatCOP(remBal)}
                                   </span>
                                 </div>
 
@@ -1094,7 +1111,7 @@ export function AdminPage({ onBackToShop }) {
                           <th className="p-3">PUESTO / ORDEN</th>
                           <th className="p-3">CLIENTE & CELULAR</th>
                           <th className="p-3">DIRECCIÓN (BOGOTÁ / COL)</th>
-                          <th className="p-3">TOTAL & SALDO 80%</th>
+                          <th className="p-3">TOTAL & SALDO 50%</th>
                           <th className="p-3">ACCIONES DE FLUJO (OMS)</th>
                           <th className="p-3 text-right">WHATSAPP / DETALLE</th>
                         </tr>
@@ -1108,7 +1125,7 @@ export function AdminPage({ onBackToShop }) {
                             Number(order.remainingBalance) > 0
                               ? Number(order.remainingBalance)
                               : totalVal >= 50000
-                              ? totalVal - Math.ceil(totalVal * 0.20)
+                              ? totalVal - Math.ceil(totalVal * 0.50)
                               : totalVal;
 
                           // Estado siguiente en el ciclo de vida guiado
@@ -1316,7 +1333,7 @@ export function AdminPage({ onBackToShop }) {
                   </div>
                 </div>
 
-                {/* Desglose de Anticipo 20% y Saldo Restante 80% */}
+                {/* Desglose de Anticipo 50% y Saldo Restante 50% */}
                 <div className="bg-black/60 p-3 border border-amber-500/40 grid grid-cols-3 gap-2">
                   <div>
                     <span className="text-[9px] text-neutral-400 uppercase block">Anticipo Exacto</span>
@@ -1722,7 +1739,12 @@ export function AdminPage({ onBackToShop }) {
                         />
                         <button
                           type="button"
-                          onClick={() => setFormImages(formImages.filter((_, idx) => idx !== i))}
+                          onClick={() => {
+                            if (typeof img === 'string' && img.startsWith('blob:')) {
+                              URL.revokeObjectURL(img);
+                            }
+                            setFormImages(formImages.filter((_, idx) => idx !== i));
+                          }}
                           className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                           title="Eliminar foto"
                         >

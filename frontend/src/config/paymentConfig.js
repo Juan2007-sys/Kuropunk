@@ -4,7 +4,7 @@
  */
 
 export const DEPOSIT_THRESHOLD_COP = 50000;
-export const DEPOSIT_PERCENTAGE = 0.20;
+export const DEPOSIT_PERCENTAGE = 0.50;
 
 export const PAYMENT_ACCOUNTS = [
   {

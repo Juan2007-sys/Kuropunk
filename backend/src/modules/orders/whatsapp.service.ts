@@ -184,12 +184,12 @@ export class WhatsAppService {
         const formattedRemaining = `$ ${remaining.toLocaleString('es-CO')} COP`;
         return `> 💀 *KUROPUNK* | _Taller Textil Underground_\n` +
           `> ✅ *ANTICIPO ACEPTADO · PEDIDO EN COLA OFICIAL*\n\n` +
-          `¡Hola *${customerName}*! Confirmamos la recepción de tu anticipo del 20% (*${formattedDeposit}*) para la orden \`#${order.id}\`.\n\n` +
+          `¡Hola *${customerName}*! Confirmamos la recepción de tu anticipo del 50% (*${formattedDeposit}*) para la orden \`#${order.id}\`.\n\n` +
           `📋 *ESTADO DE TU ORDEN*\n` +
           `▪️ *Estado:* En Cola Oficial de Producción\n` +
           `▪️ *Seguimiento:* \`${trackingId}\`\n` +
           `▪️ *Anticipo Aprobado:* ${formattedDeposit}\n` +
-          `▪️ *Saldo Restante Contraentrega (80%):* *${formattedRemaining}*\n\n` +
+          `▪️ *Saldo Restante Contraentrega (50%):* *${formattedRemaining}*\n\n` +
           `Iniciamos la confección de tu pieza y te avisaremos en cuanto salga a despacho. ¡Gracias por tu compra! 🧶🖤`;
       }
 

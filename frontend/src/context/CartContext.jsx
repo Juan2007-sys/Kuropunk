@@ -1,20 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { PRODUCTS } from '../data/products';
 
 const CartContext = createContext(null);
+const CartActionsContext = createContext(null);
+const ToastContext = createContext(null);
 
 export const CartProvider = ({ children }) => {
-  // Pre-load default cart items
   const [cart, setCart] = useState(() => {
     const saved = localStorage.getItem('vandal_stitch_cart');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Sanitizar ítems legacy con precios en USD o shorthand (< 1000 COP) y filtrar productos inactivos
         return parsed
           .filter(item => {
             const found = PRODUCTS.find(p => p.id === item.id);
-            // Si el producto está en el catálogo estático y está desactivado o agotado, eliminarlo del carrito
             if (found && (found.isActive === false || (typeof found.stock === 'number' && found.stock <= 0))) {
               return false;
             }
@@ -46,7 +45,6 @@ export const CartProvider = ({ children }) => {
     return [];
   });
 
-  // Persistent Wishlist
   const [wishlist, setWishlist] = useState(() => {
     const saved = localStorage.getItem('vandal_stitch_wishlist');
     if (saved) {
@@ -64,23 +62,44 @@ export const CartProvider = ({ children }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+
+  const toastTimerRef = useRef(null);
+
   useEffect(() => {
-    localStorage.setItem('vandal_stitch_cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem('vandal_stitch_cart', JSON.stringify(cart));
+    } catch {}
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('vandal_stitch_wishlist', JSON.stringify(wishlist));
+    try {
+      localStorage.setItem('vandal_stitch_wishlist', JSON.stringify(wishlist));
+    } catch {}
   }, [wishlist]);
 
-  const showToast = (message, type = "info") => {
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showToast = useCallback((message, type = "info") => {
     const toastId = Date.now();
     setToastMessage({ message, type, id: toastId });
-    setTimeout(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage((current) => (current?.id === toastId ? null : current));
+      toastTimerRef.current = null;
     }, 3500);
-  };
+  }, []);
 
-  const toggleWishlist = (productId, productTitle = "PRODUCT") => {
+  const toggleWishlist = useCallback((productId, productTitle = "PRODUCT") => {
     setWishlist((prev) => {
       if (prev.includes(productId)) {
         showToast(`[REMOVIDO] ${productTitle.toUpperCase()} DE FAVORITOS`, "info");
@@ -90,11 +109,11 @@ export const CartProvider = ({ children }) => {
         return [...prev, productId];
       }
     });
-  };
+  }, [showToast]);
 
-  const isInWishlist = (productId) => wishlist.includes(productId);
+  const isInWishlist = useCallback((productId) => wishlist.includes(productId), [wishlist]);
 
-  const getProductMaxStock = (productOrId, fallbackStock) => {
+  const getProductMaxStock = useCallback((productOrId, fallbackStock) => {
     if (typeof productOrId === 'object' && productOrId !== null && typeof productOrId.stock === 'number') {
       return productOrId.stock;
     }
@@ -102,9 +121,9 @@ export const CartProvider = ({ children }) => {
     const found = PRODUCTS.find((p) => p.id === id);
     if (typeof found?.stock === 'number') return found.stock;
     return typeof fallbackStock === 'number' ? fallbackStock : null;
-  };
+  }, []);
 
-  const addToCart = (product, quantity = 1, options = {}) => {
+  const addToCart = useCallback((product, quantity = 1, options = {}) => {
     let safePrice = Number(product.price);
     if (safePrice > 0 && safePrice < 1000) {
       safePrice = safePrice * 1000;
@@ -118,7 +137,7 @@ export const CartProvider = ({ children }) => {
       return;
     }
 
-    const existingItem = cart.find((item) => item.id === product.id);
+    const existingItem = cartRef.current.find((item) => item.id === product.id);
     const currentQty = existingItem ? existingItem.quantity : 0;
 
     if (maxStock !== null && currentQty >= maxStock) {
@@ -174,15 +193,15 @@ export const CartProvider = ({ children }) => {
       showToast(`[+${addedQty}] ${product.title.toUpperCase()} AGREGADO AL CARRITO`, "success");
     }
     setIsCartOpen(true);
-  };
+  }, [getProductMaxStock, showToast]);
 
-  const removeFromCart = (productId) => {
+  const removeFromCart = useCallback((productId) => {
     setCart((prev) => prev.filter((item) => item.id !== productId));
     showToast(`ITEM REMOVIDO DEL CARRITO`, "warning");
-  };
+  }, [showToast]);
 
-  const updateQuantity = (productId, delta) => {
-    const target = cart.find((item) => item.id === productId);
+  const updateQuantity = useCallback((productId, delta) => {
+    const target = cartRef.current.find((item) => item.id === productId);
     if (target && delta > 0) {
       const maxStock = getProductMaxStock(productId, target.stock);
       if (maxStock !== null && target.quantity >= maxStock) {
@@ -212,42 +231,88 @@ export const CartProvider = ({ children }) => {
         })
         .filter(Boolean);
     });
-  };
+  }, [getProductMaxStock, showToast]);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([]);
-  };
+  }, []);
 
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalItems = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
+  const subtotal = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+
+  // Isolated actions object (stable references across cart/toast changes)
+  const actionsValue = useMemo(() => ({
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    setIsCartOpen,
+    showToast,
+    toggleWishlist,
+  }), [addToCart, removeFromCart, updateQuantity, clearCart, showToast, toggleWishlist]);
+
+  // Isolated toast state (only Toast component subscribes, preventing app-wide re-renders)
+  const toastValue = useMemo(() => ({
+    toastMessage,
+    setToastMessage,
+    showToast,
+  }), [toastMessage, showToast]);
+
+  // Full cart state (without toastMessage, so toasts never trigger consumers to re-render)
+  const cartValue = useMemo(() => ({
+    cart,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    isCartOpen,
+    setIsCartOpen,
+    totalItems,
+    subtotal,
+    showToast,
+    wishlist,
+    toggleWishlist,
+    isInWishlist,
+  }), [
+    cart,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    isCartOpen,
+    totalItems,
+    subtotal,
+    showToast,
+    wishlist,
+    toggleWishlist,
+    isInWishlist,
+  ]);
 
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        isCartOpen,
-        setIsCartOpen,
-        totalItems,
-        subtotal,
-        toastMessage,
-        setToastMessage,
-        showToast,
-        wishlist,
-        toggleWishlist,
-        isInWishlist,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+    <ToastContext.Provider value={toastValue}>
+      <CartActionsContext.Provider value={actionsValue}>
+        <CartContext.Provider value={cartValue}>
+          {children}
+        </CartContext.Provider>
+      </CartActionsContext.Provider>
+    </ToastContext.Provider>
   );
 };
 
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) throw new Error("useCart must be used within a CartProvider");
+  return context;
+};
+
+export const useCartActions = () => {
+  const context = useContext(CartActionsContext);
+  if (!context) throw new Error("useCartActions must be used within a CartProvider");
+  return context;
+};
+
+export const useToastState = () => {
+  const context = useContext(ToastContext);
+  if (!context) throw new Error("useToastState must be used within a CartProvider");
   return context;
 };

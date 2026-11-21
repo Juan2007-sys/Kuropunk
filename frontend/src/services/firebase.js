@@ -22,6 +22,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   serverTimestamp
 } from 'firebase/firestore';
 import {
@@ -169,6 +170,38 @@ if (typeof window !== 'undefined' && app) {
     });
 }
 
+const MAX_LOCAL_CACHE_ITEMS = 15;
+
+function stripInlineImagePayload(url) {
+  if (typeof url !== 'string') return url || null;
+  if (url.startsWith('data:image/')) return '';
+  return url;
+}
+
+export function sanitizeOrderForLocalCache(order) {
+  if (!order || typeof order !== 'object') return order;
+  return {
+    ...order,
+    paymentProofUrl: stripInlineImagePayload(order.paymentProofUrl),
+  };
+}
+
+function sanitizeContactForLocalCache(msg) {
+  if (!msg || typeof msg !== 'object') return msg;
+  return {
+    ...msg,
+    images: Array.isArray(msg.images)
+      ? msg.images.filter((u) => typeof u === 'string' && !u.startsWith('data:image/'))
+      : [],
+  };
+}
+
+function notifyLastOrderUpdated() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kuropunk:order-updated'));
+  }
+}
+
 /**
  * Subscribes in real-time to ALL contact messages (Admin only)
  */
@@ -187,7 +220,7 @@ export function subscribeContactMessages(onData, onError) {
   }
 
   if (!isFirebaseConfigured) return () => {};
-  const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, 'contact_messages'), orderBy('createdAt', 'desc'), limit(50));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -248,12 +281,12 @@ export async function saveContactMessageInFirestore(contactData) {
     createdAt: new Date().toISOString(),
   };
 
-  // Always persist locally for instant UI update & offline reliability
+  // Always persist lightweight metadata locally (without base64 images) for instant UI update & offline reliability
   try {
     const existing = localStorage.getItem('kuropunk_contact_messages');
     const list = existing ? JSON.parse(existing) : [];
-    list.unshift(payload);
-    localStorage.setItem('kuropunk_contact_messages', JSON.stringify(list));
+    list.unshift(sanitizeContactForLocalCache(payload));
+    localStorage.setItem('kuropunk_contact_messages', JSON.stringify(list.slice(0, MAX_LOCAL_CACHE_ITEMS)));
   } catch (storageErr) {
     console.warn('[KuroPunk] LocalStorage contact message cache error:', storageErr);
   }
@@ -387,7 +420,7 @@ export async function createFirestoreOrder(orderData) {
     orderData.depositBaseAmount !== undefined
       ? Number(orderData.depositBaseAmount)
       : requiresDeposit
-      ? Math.ceil(totalVal * 0.20)
+      ? Math.ceil(totalVal * 0.50)
       : 0;
   const depositRequiredAmount =
     orderData.depositRequiredAmount !== undefined
@@ -431,16 +464,17 @@ export async function createFirestoreOrder(orderData) {
     updatedAt: new Date().toISOString()
   };
 
-  // Persistir en caché local para respuesta instantánea en Radar Admin y Tracking
+  // Persistir metadatos ligeros en caché local (sin dataURLs base64)
   try {
+    const safeOrder = sanitizeOrderForLocalCache(payload);
     const existing = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
     const idx = existing.findIndex((o) => o.id === orderId);
     if (idx >= 0) {
-      existing[idx] = { ...existing[idx], ...payload };
+      existing[idx] = { ...existing[idx], ...safeOrder };
     } else {
-      existing.unshift(payload);
+      existing.unshift(safeOrder);
     }
-    localStorage.setItem('kuropunk_local_orders', JSON.stringify(existing));
+    localStorage.setItem('kuropunk_local_orders', JSON.stringify(existing.slice(0, MAX_LOCAL_CACHE_ITEMS)));
   } catch {}
 
   if (isFirebaseConfigured) {
@@ -479,7 +513,8 @@ export function subscribeUserOrders(userId, onData, onError) {
   const q = query(
     collection(db, 'orders'),
     where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(30)
   );
 
   return onSnapshot(
@@ -511,7 +546,7 @@ export function subscribeAllOrders(onData, onError) {
     return () => {};
   }
 
-  const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(50));
 
   return onSnapshot(
     q,
@@ -533,15 +568,17 @@ export function subscribeAllOrders(onData, onError) {
  */
 export async function updateOrderStatusInFirestore(orderId, newStatus, extraFields = {}) {
   try {
+    const safeExtra = sanitizeOrderForLocalCache(extraFields);
     const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
     const idx = local.findIndex((o) => o.id === orderId);
     if (idx >= 0) {
-      local[idx] = { ...local[idx], status: newStatus, ...extraFields, updatedAt: new Date().toISOString() };
-      localStorage.setItem('kuropunk_local_orders', JSON.stringify(local));
+      local[idx] = sanitizeOrderForLocalCache({ ...local[idx], status: newStatus, ...safeExtra, updatedAt: new Date().toISOString() });
+      localStorage.setItem('kuropunk_local_orders', JSON.stringify(local.slice(0, MAX_LOCAL_CACHE_ITEMS)));
     }
     const last = JSON.parse(localStorage.getItem('kuropunk_last_order') || 'null');
     if (last && last.id === orderId) {
-      localStorage.setItem('kuropunk_last_order', JSON.stringify({ ...last, status: newStatus, ...extraFields }));
+      localStorage.setItem('kuropunk_last_order', JSON.stringify(sanitizeOrderForLocalCache({ ...last, status: newStatus, ...safeExtra })));
+      notifyLastOrderUpdated();
     }
   } catch {}
 
@@ -717,15 +754,16 @@ export function subscribeToOrderById(orderId, onData) {
       if (snap.exists()) {
         const data = { id: snap.id, ...snap.data() };
         try {
+          const safeData = sanitizeOrderForLocalCache(data);
           const local = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
           const idx = local.findIndex((o) => String(o.id) === String(orderId));
           if (idx >= 0) {
-            local[idx] = { ...local[idx], ...data };
-            localStorage.setItem('kuropunk_local_orders', JSON.stringify(local));
+            local[idx] = sanitizeOrderForLocalCache({ ...local[idx], ...safeData });
+            localStorage.setItem('kuropunk_local_orders', JSON.stringify(local.slice(0, MAX_LOCAL_CACHE_ITEMS)));
           }
           const last = JSON.parse(localStorage.getItem('kuropunk_last_order') || 'null');
           if (last && String(last.id) === String(orderId)) {
-            localStorage.setItem('kuropunk_last_order', JSON.stringify({ ...last, ...data }));
+            localStorage.setItem('kuropunk_last_order', JSON.stringify(sanitizeOrderForLocalCache({ ...last, ...safeData })));
           }
         } catch {}
         onData(data);
@@ -874,7 +912,7 @@ export function subscribeProducts(onData, onError) {
     return () => {};
   }
 
-  const q = query(collection(db, 'products'));
+  const q = query(collection(db, 'products'), limit(50));
 
   return onSnapshot(
     q,

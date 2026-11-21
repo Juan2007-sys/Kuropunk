@@ -2,14 +2,17 @@ import React from 'react';
 import logoNegro from '../assets/logo_negro.jpeg';
 import { buildWhatsAppUrl, WHATSAPP_PHONE } from '../utils/formatters';
 
-export const Footer = ({ setCurrentView }) => {
+export const Footer = React.memo(({ setCurrentView }) => {
   return (
     <footer className="w-full bg-[#0f0e0e] border-t brutalist-border py-12 mt-16 relative z-10 overflow-hidden">
       {/* Tape Tag */}
       <div className="tape-overlay !top-[-12px] !left-8">DESDE 2024</div>
 
-      {/* Atmospheric back glow */}
-      <div className="absolute top-0 right-1/4 w-96 h-32 bg-[#e0141f]/5 blur-3xl pointer-events-none"></div>
+      {/* Atmospheric back glow (gradiente radial sin costo de blur en GPU) */}
+      <div
+        className="absolute top-0 right-1/4 w-96 h-32 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse at center, rgba(224,20,31,0.08) 0%, transparent 70%)' }}
+      ></div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-8 md:px-16 grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
         {/* Brand Bio */}
@@ -104,4 +107,4 @@ export const Footer = ({ setCurrentView }) => {
       </div>
     </footer>
   );
-};
+});

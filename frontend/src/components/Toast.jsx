@@ -1,10 +1,10 @@
 import React from 'react';
-import { useCart } from '../context/CartContext';
+import { useToastState } from '../context/CartContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Terminal, AlertTriangle, CheckCircle, X } from 'lucide-react';
 
 export const Toast = () => {
-  const { toastMessage, setToastMessage } = useCart();
+  const { toastMessage, setToastMessage } = useToastState();
 
   if (!toastMessage) return null;
 

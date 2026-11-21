@@ -102,7 +102,7 @@ export function buildWhatsAppOrderMessage(order) {
   const requiresDeposit =
     order.requiresDeposit !== undefined ? Boolean(order.requiresDeposit) : grandTotal >= 50000;
   const depositPaid = Number(
-    order.depositRequiredAmount || order.depositBaseAmount || (requiresDeposit ? Math.ceil(grandTotal * 0.2) : 0),
+    order.depositRequiredAmount || order.depositBaseAmount || (requiresDeposit ? Math.ceil(grandTotal * 0.5) : 0),
   );
   const remainingBalance = Number(
     order.remainingBalance !== undefined ? order.remainingBalance : grandTotal - depositPaid,
@@ -110,17 +110,17 @@ export function buildWhatsAppOrderMessage(order) {
 
   const paymentSummaryBlock = requiresDeposit
     ? `💰 *TOTAL DEL PEDIDO:* ${formatCOP(grandTotal)}\n` +
-      `✅ *ANTICIPO REPORTADO (20%):* *${formatCOP(depositPaid)}*${
+      `✅ *ANTICIPO REPORTADO (50%):* *${formatCOP(depositPaid)}*${
         order.paymentReference ? ` (Ref: #${order.paymentReference})` : ''
       }\n` +
-      `💵 *SALDO AL RECIBIR (80%):* *${formatCOP(remainingBalance)}*`
+      `💵 *SALDO AL RECIBIR (50%):* *${formatCOP(remainingBalance)}*`
     : `💰 *TOTAL A PAGAR AL RECIBIR:* *${formatCOP(grandTotal)}*`;
 
-  return `🧶 *KUROPUNK* | *${requiresDeposit ? 'Orden con Anticipo 20%' : 'Nueva Orden Contraentrega'}*
+  return `🧶 *KUROPUNK* | *${requiresDeposit ? 'Orden con Anticipo 50%' : 'Nueva Orden Contraentrega'}*
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ¡Hola equipo KuroPunk! Acabo de registrar mi pedido en la tienda${
-    requiresDeposit ? ' junto con el comprobante del anticipo del 20%' : ''
+    requiresDeposit ? ' junto con el comprobante del anticipo del 50%' : ''
   }.
 
 📋 *DETALLES DEL PEDIDO*
@@ -161,7 +161,7 @@ export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM',
   if (!rawPhone) return '';
   const customerName = order?.customerData?.name || order?.customerName || 'Cliente';
   const totalVal = Number(order?.totalAmount || order?.total || 0);
-  const depositVal = Number(order?.depositRequiredAmount || order?.depositBaseAmount || Math.ceil(totalVal * 0.2));
+  const depositVal = Number(order?.depositRequiredAmount || order?.depositBaseAmount || Math.ceil(totalVal * 0.5));
   const remainingVal = Number(order?.remainingBalance ?? Math.max(0, totalVal - depositVal));
   const trackingCode = order?.trackingCode || order?.trackingNumber || order?.id;
 
@@ -169,11 +169,11 @@ export function generateAdminDepositNoticeWhatsAppUrl(order, action = 'CONFIRM',
   const message = isApproved
     ? `🧶 *KUROPUNK TALLER* | *¡Anticipo Aceptado!*\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `¡Hola *${customerName}*! Te confirmamos que hemos verificado y *ACEPTADO* tu anticipo del 20% (*${formatCOP(depositVal)}*) para tu pedido.\n\n` +
+      `¡Hola *${customerName}*! Te confirmamos que hemos verificado y *ACEPTADO* tu anticipo del 50% (*${formatCOP(depositVal)}*) para tu pedido.\n\n` +
       `✅ *Estado actual:* En Cola Oficial de Producción\n` +
       `📋 *Orden:* #${order.id}\n` +
       `🔎 *Código de rastreo:* ${trackingCode}\n` +
-      `💵 *Saldo a pagar al recibir (80%):* *${formatCOP(remainingVal)}*\n\n` +
+      `💵 *Saldo a pagar al recibir (50%):* *${formatCOP(remainingVal)}*\n\n` +
       `Ya iniciamos el agendamiento de tu pieza en el taller y te avisaremos por aquí cuando salga a entrega. ¡Muchas gracias por tu compra! 🖤`
     : `⚠️ *KUROPUNK TALLER* | *Novedad con tu Comprobante*\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +

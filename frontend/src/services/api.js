@@ -1,5 +1,7 @@
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from '../data/products';
-import { getAdminAuthHeaders } from './firebase';
+import { getAdminAuthHeaders, sanitizeOrderForLocalCache } from './firebase';
+
+const MAX_LOCAL_CACHE_ORDERS = 15;
 
 const isLocalHost =
   typeof window !== 'undefined' &&
@@ -140,11 +142,13 @@ export async function submitOrder(orderData) {
     const result = json?.data !== undefined ? json.data : json;
 
     try {
-      localStorage.setItem('kuropunk_last_order', JSON.stringify(result));
+      const safeResult = sanitizeOrderForLocalCache(result);
+      localStorage.setItem('kuropunk_last_order', JSON.stringify(safeResult));
       const existingOrders = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-      const filtered = existingOrders.filter((o) => o.id !== result.id);
-      filtered.unshift(result);
-      localStorage.setItem('kuropunk_local_orders', JSON.stringify(filtered));
+      const filtered = existingOrders.filter((o) => o.id !== safeResult.id);
+      filtered.unshift(safeResult);
+      localStorage.setItem('kuropunk_local_orders', JSON.stringify(filtered.slice(0, MAX_LOCAL_CACHE_ORDERS)));
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('kuropunk:order-updated'));
     } catch (e) {}
 
     return result;
@@ -160,7 +164,7 @@ export async function submitOrder(orderData) {
         'No pudimos conectar con el servidor de pedidos en este momento. Por favor intenta de nuevo en unos segundos.',
       );
     }
-    // Si la API está inalcanzable, calcular de forma determinista la regla de los $50.000 COP (>= 50k pide 20%)
+    // Si la API está inalcanzable, calcular de forma determinista la regla de los $50.000 COP (>= 50k pide 50%)
     const officialSubtotal = (orderData.items || []).reduce((acc, it) => {
       const prod = ALL_LOCAL_PRODUCTS.find((p) => String(p.id) === String(it.productId));
       const unitPrice = prod ? Number(prod.price) : Number(it.price || 0);
@@ -168,7 +172,7 @@ export async function submitOrder(orderData) {
     }, 0);
     const total = officialSubtotal;
     const requiresDeposit = total >= 50000;
-    const depositBaseAmount = requiresDeposit ? Math.ceil(total * 0.20) : 0;
+    const depositBaseAmount = requiresDeposit ? Math.ceil(total * 0.50) : 0;
     const depositRequiredAmount = depositBaseAmount;
     const remainingBalance = total - depositBaseAmount;
     const cleanPhone = String(orderData.phone || '').replace(/\D/g, '').replace(/^57(?=\d{10}$)/, '');
@@ -214,17 +218,19 @@ export async function submitOrder(orderData) {
       createdAt: new Date().toISOString(),
     };
     try {
-      localStorage.setItem('kuropunk_last_order', JSON.stringify(offlineResult));
+      const safeOffline = sanitizeOrderForLocalCache(offlineResult);
+      localStorage.setItem('kuropunk_last_order', JSON.stringify(safeOffline));
       const existingOrders = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-      existingOrders.unshift(offlineResult);
-      localStorage.setItem('kuropunk_local_orders', JSON.stringify(existingOrders));
+      existingOrders.unshift(safeOffline);
+      localStorage.setItem('kuropunk_local_orders', JSON.stringify(existingOrders.slice(0, MAX_LOCAL_CACHE_ORDERS)));
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('kuropunk:order-updated'));
     } catch (e) {}
     return offlineResult;
   }
 }
 
 /**
- * Reporta el número de comprobante / referencia del anticipo del 20%
+ * Reporta el número de comprobante / referencia del anticipo del 50%
  */
 export async function reportOrderPayment(orderId, { paymentReference, paymentProofUrl = '' }) {
   const cleanRef = String(paymentReference || '').trim().toUpperCase();
@@ -291,7 +297,7 @@ export async function reportOrderPayment(orderId, { paymentReference, paymentPro
 }
 
 /**
- * Admin verifica o rechaza el anticipo del 20% y asigna puesto en cola (queuedAt)
+ * Admin verifica o rechaza el anticipo del 50% y asigna puesto en cola (queuedAt)
  */
 export async function verifyOrderDeposit(orderId, { action, notes = '' }) {
   const act = String(action || '').toUpperCase();
@@ -501,36 +507,40 @@ export async function syncProductToBackendApi(productData) {
 function syncOrderToLocalCache(updatedOrder) {
   if (!updatedOrder || !updatedOrder.id) return;
   try {
+    const safeUpdated = sanitizeOrderForLocalCache(updatedOrder);
     const last = JSON.parse(localStorage.getItem('kuropunk_last_order') || 'null');
-    if (last && last.id === updatedOrder.id) {
-      localStorage.setItem('kuropunk_last_order', JSON.stringify({ ...last, ...updatedOrder }));
+    if (last && last.id === safeUpdated.id) {
+      localStorage.setItem('kuropunk_last_order', JSON.stringify(sanitizeOrderForLocalCache({ ...last, ...safeUpdated })));
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('kuropunk:order-updated'));
     }
     const list = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
-    const idx = list.findIndex((o) => o.id === updatedOrder.id);
+    const idx = list.findIndex((o) => o.id === safeUpdated.id);
     if (idx >= 0) {
-      list[idx] = { ...list[idx], ...updatedOrder };
+      list[idx] = sanitizeOrderForLocalCache({ ...list[idx], ...safeUpdated });
     } else {
-      list.unshift(updatedOrder);
+      list.unshift(safeUpdated);
     }
-    localStorage.setItem('kuropunk_local_orders', JSON.stringify(list));
+    localStorage.setItem('kuropunk_local_orders', JSON.stringify(list.slice(0, MAX_LOCAL_CACHE_ORDERS)));
   } catch {}
 }
 
 function updateLocalOrderFields(orderId, fields) {
   let result = { id: orderId, ...fields };
   try {
+    const safeFields = sanitizeOrderForLocalCache(fields);
     const last = JSON.parse(localStorage.getItem('kuropunk_last_order') || 'null');
     if (last && last.id === orderId) {
-      const merged = { ...last, ...fields };
+      const merged = sanitizeOrderForLocalCache({ ...last, ...safeFields });
       localStorage.setItem('kuropunk_last_order', JSON.stringify(merged));
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('kuropunk:order-updated'));
       result = merged;
     }
     const list = JSON.parse(localStorage.getItem('kuropunk_local_orders') || '[]');
     const idx = list.findIndex((o) => o.id === orderId);
     if (idx >= 0) {
-      list[idx] = { ...list[idx], ...fields };
+      list[idx] = sanitizeOrderForLocalCache({ ...list[idx], ...safeFields });
       result = list[idx];
-      localStorage.setItem('kuropunk_local_orders', JSON.stringify(list));
+      localStorage.setItem('kuropunk_local_orders', JSON.stringify(list.slice(0, MAX_LOCAL_CACHE_ORDERS)));
     }
   } catch {}
   return result;

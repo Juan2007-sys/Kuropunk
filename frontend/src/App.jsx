@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
-import { CartProvider, useCart } from './context/CartContext';
+import { CartProvider, useCartActions } from './context/CartContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -11,7 +11,7 @@ import { ShopPage } from './pages/ShopPage';
 import { AdminGuard } from './guards/AdminGuard';
 import { PRODUCTS, PUNTO_CRUZ_PRODUCTS, PATRONES_PRODUCTS } from './data/products';
 import { Toaster, toast } from 'sonner';
-import { subscribeToOrderById } from './services/firebase';
+import { subscribeToOrderById, isFirebaseConfigured } from './services/firebase';
 import { trackOrder, getProductById } from './services/api';
 
 // Catálogo unificado para resolución directa de URLs compartidas y navegación
@@ -85,7 +85,7 @@ export function AppContent() {
   const [isWorkshopHUDOpen, setIsWorkshopHUDOpen] = useState(false);
   const [isAuthenticityOpen, setIsAuthenticityOpen] = useState(false);
   const [depositNoticeBanner, setDepositNoticeBanner] = useState(null);
-  const { setIsCartOpen } = useCart();
+  const { setIsCartOpen } = useCartActions();
   const { currentUser, isAdmin } = useAuth();
   const currentViewRef = useRef(currentView);
   currentViewRef.current = currentView;
@@ -105,7 +105,7 @@ export function AppContent() {
         const notifiedList = JSON.parse(localStorage.getItem('kuropunk_notified_orders') || '[]');
         if (notifiedList.includes(notifyKey)) return;
         notifiedList.push(notifyKey);
-        localStorage.setItem('kuropunk_notified_orders', JSON.stringify(notifiedList));
+        localStorage.setItem('kuropunk_notified_orders', JSON.stringify(notifiedList.slice(-30)));
       } catch {}
 
       setDepositNoticeBanner({
@@ -137,7 +137,9 @@ export function AppContent() {
           });
         }
 
+        // Fallback REST polling solo cuando Firebase no está configurado
         if (
+          !isFirebaseConfigured &&
           (typeof document === 'undefined' || document.visibilityState === 'visible') &&
           (String(lastOrder.status || '').toUpperCase() === 'VERIFICANDO_ANTICIPO' ||
             String(lastOrder.paymentStatus || '').toUpperCase() === 'VERIFICANDO_ANTICIPO')
@@ -149,11 +151,15 @@ export function AppContent() {
     };
 
     syncWatcher();
-    const intervalId = setInterval(syncWatcher, 15000);
+    window.addEventListener('kuropunk:order-updated', syncWatcher);
+    window.addEventListener('storage', syncWatcher);
+    const intervalId = !isFirebaseConfigured ? setInterval(syncWatcher, 15000) : null;
 
     return () => {
       activeUnsub();
-      clearInterval(intervalId);
+      window.removeEventListener('kuropunk:order-updated', syncWatcher);
+      window.removeEventListener('storage', syncWatcher);
+      if (intervalId) clearInterval(intervalId);
     };
   }, []);
 
@@ -184,8 +190,10 @@ export function AppContent() {
     }
   }, [navigateTo]);
 
-  // Listener para soportar Botón Atrás (Back), Botón Adelante (Forward) y gestos táctiles móviles
+  // Listener para soportar Botón Atrás (Back), Botón Adelante (Forward) y gestos táctiles móviles (deduplicado)
   useEffect(() => {
+    let lastHandledHash = window.location.hash;
+
     const resolveProductFromRoute = (productId) => {
       if (!productId) return;
       const found = ALL_CATALOG_PRODUCTS.find(p => p.id === productId || p.sku === productId);
@@ -201,6 +209,10 @@ export function AppContent() {
     };
 
     const handleLocationChange = () => {
+      const currentHash = window.location.hash;
+      if (currentHash === lastHandledHash) return;
+      lastHandledHash = currentHash;
+
       const { view, productId } = parseHashRoute();
       if (view === 'product-detail' && productId) {
         resolveProductFromRoute(productId);
@@ -215,6 +227,7 @@ export function AppContent() {
     // Asegurar que la entrada inicial exista en el stack de historial
     if (!window.location.hash || window.location.hash === '#/' || window.location.hash === '#') {
       window.history.replaceState({ view: 'home' }, '', '#/');
+      lastHandledHash = '#/';
     }
 
     window.addEventListener('popstate', handleLocationChange);
@@ -264,8 +277,8 @@ export function AppContent() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#080808] text-[#e6e1e1] selection:bg-[#FF0033] selection:text-[#fff4f3] overflow-x-hidden">
-      {/* 1. Interactive Canvas Shader Grime & Spray Effect */}
-      <ConcreteShaderCanvas />
+      {/* 1. Interactive Canvas Shader Grime & Spray Effect (pausado cuando hay modales abiertos) */}
+      <ConcreteShaderCanvas paused={anyModalOpen} />
 
       {/* 2. Global Persistent Navigation Bar */}
       <Navbar 
@@ -381,8 +394,8 @@ export function AppContent() {
       <Toast />
       <Toaster position="bottom-right" theme="dark" richColors />
 
-      {/* 6. Main Routed Screen (respuesta instantánea sin bloqueo de AnimatePresence mode="wait") */}
-      <main className="flex-grow pt-20 sm:pt-24 relative z-10">
+      {/* 6. Main Routed Screen (sin z-10 para no crear stacking context que atrape modales z-50 debajo del Navbar z-40) */}
+      <main className="flex-grow pt-20 sm:pt-24 relative">
         <Suspense fallback={<PageLoadingFallback />}>
           {currentView === 'home' && (
             <HomePage

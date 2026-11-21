@@ -31,8 +31,8 @@ import {
 const TIMELINE_STEPS = [
   {
     key: 'ESPERANDO_PAGO',
-    title: '1. Anticipo del 20% (Reserva de Materiales)',
-    desc: 'Para pedidos desde $50.000 COP se valida el anticipo del 20% antes de asignar puesto en la cola.',
+    title: '1. Anticipo del 50% (Reserva de Materiales)',
+    desc: 'Para pedidos desde $50.000 COP se valida el anticipo del 50% antes de asignar puesto en la cola.',
     icon: Lock,
   },
   {
@@ -190,11 +190,11 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
   const currentStepIdx = order ? getStepIndex(order.status) : 0;
   const orderTotal = Number(order?.total || order?.totalAmount || 0);
   const requiresDeposit = order?.requiresDeposit !== undefined ? Boolean(order.requiresDeposit) : orderTotal >= 50000;
-  const depositAmount = Number(order?.depositRequiredAmount || order?.depositBaseAmount || (requiresDeposit ? Math.ceil(orderTotal * 0.20) : 0));
+  const depositAmount = Number(order?.depositRequiredAmount || order?.depositBaseAmount || (requiresDeposit ? Math.ceil(orderTotal * 0.50) : 0));
   const remainingBalance = Number(
     order?.remainingBalance !== undefined
       ? order.remainingBalance
-      : orderTotal - (requiresDeposit ? Math.ceil(orderTotal * 0.20) : 0),
+      : orderTotal - (requiresDeposit ? Math.ceil(orderTotal * 0.50) : 0),
   );
   const statusUpper = String(order?.status || '').toUpperCase();
 
@@ -207,7 +207,7 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/85 backdrop-blur-md"
+          className="fixed inset-0 bg-black/90"
         />
 
         {/* Modal Window */}
@@ -295,7 +295,7 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                   <div className="flex items-center justify-between border-b border-[#5e3f3c] pb-2">
                     <span className="text-[#ffb4ab] font-bold uppercase flex items-center gap-1.5">
                       <Lock className="w-4 h-4 text-[#e0141f]" />
-                      ESTADO: ESPERANDO PAGO DEL ANTICIPO (20%)
+                      ESTADO: ESPERANDO PAGO DEL ANTICIPO (50%)
                     </span>
                     {order.paymentStatus === 'RECHAZADO' && (
                       <span className="px-2 py-0.5 bg-red-900 text-white text-[10px] font-bold uppercase">
@@ -305,12 +305,12 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                   </div>
 
                   <p className="text-neutral-300 leading-relaxed">
-                    Para ingresar tu pedido a la cola oficial de producción, transfiere el anticipo del 20% a nuestra llave oficial y adjunta la referencia junto con la foto del comprobante:
+                    Para ingresar tu pedido a la cola oficial de producción, transfiere el anticipo del 50% a nuestra llave oficial y adjunta la referencia junto con la foto del comprobante:
                   </p>
 
                   <div className="p-3 bg-[#1d1b1b] border border-[#25D366] flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] text-[#25D366] uppercase block">Valor del Anticipo (20%):</span>
+                      <span className="text-[10px] text-[#25D366] uppercase block">Valor del Anticipo (50%):</span>
                       <strong className="text-2xl text-white font-headline-md">{formatCOP(depositAmount)}</strong>
                     </div>
                     <button
@@ -403,7 +403,7 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                       <CheckCircle2 className="w-4 h-4" />
                       <span>
                         {requiresDeposit
-                          ? '✓ ANTICIPO DEL 20% VERIFICADO · EN COLA OFICIAL'
+                          ? '✓ ANTICIPO DEL 50% VERIFICADO · EN COLA OFICIAL'
                           : '✓ PEDIDO EN COLA OFICIAL DE PRODUCCIÓN'}
                       </span>
                     </span>
@@ -481,14 +481,14 @@ export const OrderTrackingModal = ({ isOpen, onClose }) => {
                 </div>
                 {requiresDeposit && (
                   <div className="flex justify-between text-neutral-400">
-                    <span>Anticipo Requerido (20%):</span>
+                    <span>Anticipo Requerido (50%):</span>
                     <span className="text-[#ffb4ab] font-bold">
                       {formatCOP(depositAmount)} ({order.paymentStatus || 'PENDIENTE'})
                     </span>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t border-neutral-800 text-sm">
-                  <span className="text-white font-bold">Saldo Restante a Pagar en la Entrega (80%):</span>
+                  <span className="text-white font-bold">Saldo Restante a Pagar en la Entrega (50%):</span>
                   <span className="text-emerald-400 font-bold text-base">{formatCOP(remainingBalance)}</span>
                 </div>
               </div>

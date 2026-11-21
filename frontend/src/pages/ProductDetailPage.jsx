@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { PRODUCTS } from '../data/products';
 import { useCart } from '../context/CartContext';
 import { formatCOP, WHATSAPP_PHONE_DISPLAY } from '../utils/formatters';
@@ -29,10 +29,17 @@ import {
 import Lightbox from 'yet-another-react-lightbox';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import 'yet-another-react-lightbox/styles.css';
-import { CrossStitchViewerModal } from '../components/CrossStitchViewerModal';
-import { WorkshopHUDModal } from '../components/WorkshopHUDModal';
-import { AuthenticityModal } from '../components/AuthenticityModal';
 import { launchCartBezierFlight } from '../components/ProductCard';
+
+const CrossStitchViewerModal = lazy(() =>
+  import('../components/CrossStitchViewerModal').then((m) => ({ default: m.CrossStitchViewerModal }))
+);
+const WorkshopHUDModal = lazy(() =>
+  import('../components/WorkshopHUDModal').then((m) => ({ default: m.WorkshopHUDModal }))
+);
+const AuthenticityModal = lazy(() =>
+  import('../components/AuthenticityModal').then((m) => ({ default: m.AuthenticityModal }))
+);
 
 export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) => {
   const { addToCart, showToast, toggleWishlist, isInWishlist } = useCart();
@@ -242,7 +249,7 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
             </div>
 
             {/* Zoom Tooltip */}
-            <div className="absolute top-4 right-4 z-20 bg-black/70 backdrop-blur-md px-2.5 py-1 text-[10px] font-mono text-neutral-400 border border-neutral-800 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-4 right-4 z-20 bg-black/85 px-2.5 py-1 text-[10px] font-mono text-neutral-400 border border-neutral-800 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <ZoomIn className="w-3.5 h-3.5 text-[#FF0033]" />
               <span>ZOOM HD (CLICK)</span>
             </div>
@@ -705,29 +712,41 @@ export const ProductDetailPage = ({ product, onSelectProduct, onBackToShop }) =>
         </div>
       </section>
 
-      {/* Visor Táctico de Punto de Cruz (DMC) */}
-      <CrossStitchViewerModal
-        isOpen={isCrossStitchOpen}
-        onClose={() => setIsCrossStitchOpen(false)}
-        productTitle={product.title}
-      />
+      {/* Visor Táctico de Punto de Cruz (DMC) - Lazy Loaded */}
+      {isCrossStitchOpen && (
+        <Suspense fallback={null}>
+          <CrossStitchViewerModal
+            isOpen={isCrossStitchOpen}
+            onClose={() => setIsCrossStitchOpen(false)}
+            productTitle={product.title}
+          />
+        </Suspense>
+      )}
 
-      {/* HUD Modo Taller // Contador de Vueltas */}
-      <WorkshopHUDModal
-        isOpen={isWorkshopHUDOpen}
-        onClose={() => setIsWorkshopHUDOpen(false)}
-        currentPatternTitle={product.title}
-      />
+      {/* HUD Modo Taller // Contador de Vueltas - Lazy Loaded */}
+      {isWorkshopHUDOpen && (
+        <Suspense fallback={null}>
+          <WorkshopHUDModal
+            isOpen={isWorkshopHUDOpen}
+            onClose={() => setIsWorkshopHUDOpen(false)}
+            currentPatternTitle={product.title}
+          />
+        </Suspense>
+      )}
 
-      {/* Verificador de Certificado de Autenticidad */}
-      <AuthenticityModal
-        isOpen={isAuthenticityOpen}
-        onClose={() => setIsAuthenticityOpen(false)}
-        initialSerial={product.sku || 'RX-00-042'}
-      />
+      {/* Verificador de Certificado de Autenticidad - Lazy Loaded */}
+      {isAuthenticityOpen && (
+        <Suspense fallback={null}>
+          <AuthenticityModal
+            isOpen={isAuthenticityOpen}
+            onClose={() => setIsAuthenticityOpen(false)}
+            initialSerial={product.sku || 'RX-00-042'}
+          />
+        </Suspense>
+      )}
 
       {/* Floating Mobile Bottom Action Bar (Safe Area & Thumb Friendly) */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e0e]/95 backdrop-blur-md border-t border-neutral-800 p-3 sm:hidden pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 shadow-[0_-4px_25px_rgba(0,0,0,0.85)]">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e0e]/95 border-t border-neutral-800 p-3 sm:hidden pb-[max(12px,env(safe-area-inset-bottom))] flex items-center justify-between gap-3 shadow-[0_-4px_25px_rgba(0,0,0,0.85)]">
         <div className="flex flex-col min-w-0 pr-2">
           <span className="text-[10px] font-mono text-neutral-400 uppercase truncate">
             {product.title}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -16,26 +17,34 @@ import {
 } from 'lucide-react';
 import { ConfirmModal } from './ConfirmModal';
 
-// Generador de sonido sintético tipo clic mecánico con Web Audio API
+// Generador de sonido sintético tipo clic mecánico con Web Audio API (singleton para evitar fuga de AudioContext)
+let sharedAudioCtx = null;
 const playMechanicalClick = (soundEnabled = true) => {
   if (!soundEnabled || typeof window === 'undefined') return;
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioCtx();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    const osc = sharedAudioCtx.createOscillator();
+    const gain = sharedAudioCtx.createGain();
 
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.04);
+    osc.frequency.setValueAtTime(800, sharedAudioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(150, sharedAudioCtx.currentTime + 0.04);
 
-    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+    gain.gain.setValueAtTime(0.3, sharedAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, sharedAudioCtx.currentTime + 0.04);
 
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(sharedAudioCtx.destination);
 
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.04);
+    osc.stop(sharedAudioCtx.currentTime + 0.04);
   } catch (e) {
     // Audio no soportado o bloqueado por el navegador
   }
@@ -126,9 +135,9 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
 
   const progressPercent = totalRounds > 0 ? Math.min(100, Math.round((currentRound / totalRounds) * 100)) : 0;
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto overscroll-contain">
+      <div className="fixed inset-0 z-[60] flex items-start sm:items-center justify-center p-3 sm:p-6 bg-black/90 overflow-y-auto overscroll-contain">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -366,6 +375,7 @@ export const WorkshopHUDModal = ({ isOpen, onClose, currentPatternTitle = "Proye
 
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

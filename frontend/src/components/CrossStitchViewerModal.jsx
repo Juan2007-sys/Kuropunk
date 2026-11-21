@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, 
@@ -74,22 +75,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
   const [activeMode, setActiveMode] = useState('inspect'); // 'inspect' | 'stitch'
   const [isConfirmResetOpen, setIsConfirmResetOpen] = useState(false);
 
-  if (!isOpen) return null;
-
-  // Toggle de puntada completada
-  const toggleStitch = (rIdx, cIdx) => {
-    if (activeMode !== 'stitch') return;
-    setGridData(prev => {
-      const copy = prev.map(row => [...row]);
-      copy[rIdx][cIdx] = {
-        ...copy[rIdx][cIdx],
-        completed: !copy[rIdx][cIdx].completed
-      };
-      return copy;
-    });
-  };
-
-  // Estadísticas de bordado
+  // Estadísticas de bordado (debe ejecutarse siempre antes de cualquier return condicional - Rules of Hooks)
   const stats = useMemo(() => {
     let total = 0;
     let completed = 0;
@@ -107,6 +93,21 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
     return { total, completed, percent, countByDmc };
   }, [gridData]);
 
+  if (!isOpen) return null;
+
+  // Toggle de puntada completada
+  const toggleStitch = (rIdx, cIdx) => {
+    if (activeMode !== 'stitch') return;
+    setGridData(prev => {
+      const copy = prev.map(row => [...row]);
+      copy[rIdx][cIdx] = {
+        ...copy[rIdx][cIdx],
+        completed: !copy[rIdx][cIdx].completed
+      };
+      return copy;
+    });
+  };
+
   const resetProgress = () => {
     setIsConfirmResetOpen(true);
   };
@@ -116,9 +117,9 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
     setIsConfirmResetOpen(false);
   };
 
-  return (
+  return createPortal(
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/90">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -128,7 +129,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
           {/* Header Superior */}
           <div className="flex items-center justify-between px-4 sm:px-5 py-3 bg-[#161414] border-b border-neutral-800 shrink-0">
             <div className="flex items-center gap-3 min-w-0 pr-2">
-              <span className="w-3 h-3 bg-[#e0141f] animate-pulse shrink-0"></span>
+              <span className="w-3 h-3 bg-[#e0141f] shrink-0"></span>
               <div className="min-w-0">
                 <h3 className="font-headline-md text-sm sm:text-lg text-white tracking-wider uppercase truncate">
                   VISOR DMC · {productTitle}
@@ -403,6 +404,7 @@ export const CrossStitchViewerModal = ({ isOpen, onClose, productTitle = "Cross 
           />
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

@@ -16,7 +16,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
       <section className="relative w-full min-h-[85vh] flex items-center justify-center overflow-hidden -mt-20 pt-28 pb-16">
         {/* Background Concrete Decay Image */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-35 sm:opacity-40 sm:mix-blend-luminosity"
+          className="absolute inset-0 bg-cover bg-center opacity-35 grayscale"
           style={{
             backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuBl3lwFZUMfheqnSQOHnN-MKt0EgDSq_vJmUd9_8iNJ5ye05z5hcIwBag8_YIzL-JkyPny6tO2ft5SnD4fZ1OP4osRThAUHckQjVAlJiUr4-SuBjpTLK82jTm8wuMPJasWe2mU3d-lNH0_lPj4rReYeUXDbnu2MMYipoyAxvg2ph-lF4Id2xw0w0w6GVsf1MSztnkj9edWDzFJ2ntwoUO5gC_wMFf2Imqe1Y2l_Tpt5g0qaqwNlMfO2')`
           }}
@@ -61,7 +61,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
 
               <button
                 onClick={() => onSelectProduct(heroProduct)}
-                className="px-6 py-4 bg-[#211f1f]/80 backdrop-blur-sm text-[#e6e1e1] font-label-caps text-xs uppercase tracking-widest border border-[#5e3f3c] hover:border-[#ffb4ab] hover:text-[#ffb4ab] transition-colors"
+                className="px-6 py-4 bg-[#211f1f]/95 text-[#e6e1e1] font-label-caps text-xs uppercase tracking-widest border border-[#5e3f3c] hover:border-[#ffb4ab] hover:text-[#ffb4ab] transition-colors"
               >
                 Inspeccionar Flagship
               </button>
@@ -122,7 +122,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
               <div className="torn-tape -top-2 -left-2 transform -rotate-12"></div>
               <div className="staple-corner top-0 right-0"></div>
               <div className="aspect-square w-full mb-4 overflow-hidden relative bg-[#141313]">
-                <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/20 transition-colors z-10 mix-blend-overlay"></div>
+                <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-colors z-10 pointer-events-none"></div>
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
                   alt="Categoría Dulce Princesa"
@@ -143,7 +143,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
               <div className="torn-tape -top-3 right-4 transform rotate-6"></div>
               <div className="staple-corner top-0 left-0"></div>
               <div className="aspect-square w-full mb-4 overflow-hidden relative bg-[#141313]">
-                <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/20 transition-colors z-10 mix-blend-overlay"></div>
+                <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-colors z-10 pointer-events-none"></div>
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
                   alt="Categoría Flagship Jungkook"
@@ -164,7 +164,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
               <div className="torn-tape -bottom-2 -left-2 transform rotate-12"></div>
               <div className="staple-corner top-0 right-0"></div>
               <div className="aspect-square w-full mb-4 overflow-hidden relative bg-[#141313]">
-                <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/20 transition-colors z-10 mix-blend-overlay"></div>
+                <div className="absolute inset-0 bg-[#e0141f]/0 group-hover:bg-[#e0141f]/15 transition-colors z-10 pointer-events-none"></div>
                 <img
                   className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500 scale-100 group-hover:scale-105"
                   alt="Categoría Mini Amigurumi"
@@ -247,7 +247,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
             backgroundImage: `url('https://lh3.googleusercontent.com/aida-public/AB6AXuD7Oyfq2iOUh-Ax7gVM_1Ka9PfIfiL2BJpLSqVdHWtpTqnbMGKEI7IEIrtlS-iqF6DV4jYwWllAjfGNQaYz19ce1fSWhQD-8KyB1Gp7qgXwSaBeTZUtYHoRUHgROyBYFcO8ZoTPeRyk3gtnFLWzVZsyGHcDJiqnZpgBXJWrpKHxOKANOZgSdyJNDgE5u7_Bz-wH8L9i9NiU2wi_ynKP6XmIGNWyAMClNX3HmNmyUcsmRipGSXMsE2ax')`
           }}
         ></div>
-        <div className="absolute inset-0 bg-[#141313]/90 mix-blend-multiply"></div>
+        <div className="absolute inset-0 bg-[#141313]/90"></div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 md:px-16 w-full flex flex-col md:flex-row justify-end items-end md:items-center py-16">
           <motion.div
@@ -255,7 +255,7 @@ export const HomePage = ({ setCurrentView, onSelectProduct }) => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="p-8 sm:p-12 border border-[#5e3f3c] max-w-xl shadow-2xl relative bg-[#211f1f]/90 backdrop-blur-md"
+            className="p-8 sm:p-12 border border-[#5e3f3c] max-w-xl shadow-2xl relative bg-[#211f1f]/95"
           >
             {/* Spray accent behind text */}
             <div className="spray-stroke-red top-8 left-0 w-full h-24 transform rotate-2 pointer-events-none opacity-30"></div>

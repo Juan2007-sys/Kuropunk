@@ -3,8 +3,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../services/firebase';
 import { PRODUCTS as fallbackCatalog } from '../data/products';
 import { formatCOP } from '../utils/formatters';
-import { Sparkles, ChevronLeft, ChevronRight, Eye, ShieldCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * AntiGravityHeroShowcase
@@ -13,10 +12,11 @@ import { motion, AnimatePresence } from 'framer-motion';
  * Calcula en tiempo real el vector de desplazamiento entre el centro del contenedor (O)
  * y la posición del cursor (P), aplicando rotación 3D, parallax y oscilación sinusoidal A*sin(wt).
  */
-export function AntiGravityHeroShowcase({ onSelectProduct }) {
+export const AntiGravityHeroShowcase = React.memo(function AntiGravityHeroShowcase({ onSelectProduct }) {
   const containerRef = useRef(null);
   const dollRef = useRef(null);
   const shadowRef = useRef(null);
+  const rectRef = useRef(null);
 
   // Lista de piezas destacadas para el Hero (solo activas con fotos reales)
   const [featuredProducts, setFeaturedProducts] = useState(() => {
@@ -25,9 +25,11 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
   });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isActiveInView, setIsActiveInView] = useState(true);
 
   // 1. Consulta dinámica de productos más vendidos / destacados en Firestore
   useEffect(() => {
+    let mounted = true;
     async function fetchShowcaseProducts() {
       if (!isFirebaseConfigured) return;
       try {
@@ -37,12 +39,12 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
           limit(6)
         );
         const snap = await getDocs(q);
+        if (!mounted) return;
         if (!snap.empty) {
           const list = snap.docs.map((doc) => ({
             id: doc.id,
             ...doc.data()
           }));
-          // Filtrar los que tengan imagen válida y sean destacados
           const filtered = list.filter((p) => p.destacado || p.isFeatured || p.isBestSeller);
           if (filtered.length > 0) {
             setFeaturedProducts(filtered.slice(0, 4));
@@ -55,22 +57,25 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       }
     }
     fetchShowcaseProducts();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // Autoplay suave para alternar entre piezas cada 7s (se pausa si el usuario tiene el mouse encima)
+  // Autoplay suave para alternar entre piezas cada 7s (se pausa si el usuario tiene el mouse encima, off-screen o tab oculta)
   useEffect(() => {
-    if (isHovered || featuredProducts.length <= 1) return;
+    if (isHovered || !isActiveInView || featuredProducts.length <= 1) return;
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       setCurrentIndex((prev) => (prev + 1) % featuredProducts.length);
     }, 7000);
     return () => clearInterval(interval);
-  }, [isHovered, featuredProducts.length]);
+  }, [isHovered, isActiveInView, featuredProducts.length]);
 
   // =========================================================================
   // 2. FÍSICA VECTORIAL Y LEVITACIÓN ANTIGRAVEDAD (requestAnimationFrame)
   // =========================================================================
   const stateRef = useRef({
-    // Vectores objetivo, actuales y velocidades (sistema masa-resorte-amortiguador)
     targetRotX: 0,
     targetRotY: 0,
     currentRotX: 0,
@@ -83,10 +88,8 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
     targetTransZ: 0,
     currentTransZ: 0,
     velTransZ: 0,
-    normDistance: 0,
-    // Parámetros de trayectoria paramétrica r(t)
-    amplitude: 14,      // Amplitud A en píxeles
-    frequency: 0.0022,  // Velocidad angular omega
+    amplitude: 14,
+    frequency: 0.0022,
     lastTimestamp: null,
     animFrameId: null
   });
@@ -94,42 +97,28 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
   useEffect(() => {
     let isRunning = true;
     let isVisible = true;
+    let isTabVisible = typeof document === 'undefined' || document.visibilityState === 'visible';
     let isScrolling = false;
     let scrollTimeoutId = null;
     const isMobile =
       typeof window !== 'undefined' &&
       (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
-    const minFrameMs = isMobile ? 32 : 16;
+    const minFrameMs = isMobile ? 33 : 20; // ~30fps mobile, ~50fps desktop
     let lastDrawTime = 0;
 
-    const handleScroll = () => {
-      if (!isMobile) return;
-      isScrolling = true;
-      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
-      scrollTimeoutId = setTimeout(() => {
-        isScrolling = false;
-      }, 120);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    // IntersectionObserver to pause loop when Hero is completely off screen
-    let observer;
-    try {
-      observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry) isVisible = entry.isIntersecting;
-        },
-        { threshold: 0 }
-      );
+    const refreshRect = () => {
       if (containerRef.current) {
-        observer.observe(containerRef.current);
+        rectRef.current = containerRef.current.getBoundingClientRect();
       }
-    } catch (e) {
-      isVisible = true;
+    };
+    refreshRect();
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(refreshRect);
+      resizeObserver.observe(containerRef.current);
     }
 
-    // Integrador semi-implícito de Euler para ecuación diferencial masa-resorte-amortiguador:
-    // a = k * (target - x) - c * v
     const stepSpring = (pos, vel, target, dt) => {
       const stiffness = 110;
       const damping = 15;
@@ -138,11 +127,24 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       return [pos + nextVel * dt, nextVel];
     };
 
+    const stopLoop = () => {
+      if (stateRef.current.animFrameId !== null) {
+        cancelAnimationFrame(stateRef.current.animFrameId);
+        stateRef.current.animFrameId = null;
+      }
+      stateRef.current.lastTimestamp = null;
+    };
+
+    const canRun = () => isRunning && isVisible && isTabVisible && !isScrolling;
+
     const updatePhysics = (timestamp) => {
-      if (!isRunning) return;
+      if (!canRun()) {
+        stateRef.current.animFrameId = null;
+        stateRef.current.lastTimestamp = null;
+        return;
+      }
       stateRef.current.animFrameId = requestAnimationFrame(updatePhysics);
 
-      if (!isVisible || isScrolling) return;
       if (timestamp - lastDrawTime < minFrameMs) return;
 
       const s = stateRef.current;
@@ -152,20 +154,18 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       s.lastTimestamp = timestamp;
       lastDrawTime = timestamp;
 
-      // 4. Trayectoria paramétrica espacial r(t) = (x(t), y(t), z(t)) tipo Lissajous
+      // Trayectoria paramétrica espacial r(t) = (x(t), y(t), z(t)) tipo Lissajous
       const omegaX = 0.0014;
       const omegaZ = 0.0011;
       const paramX = 4.5 * Math.sin(omegaX * timestamp);
       const paramY = s.amplitude * Math.sin(s.frequency * timestamp);
       const paramZ = 6 * Math.cos(omegaZ * timestamp);
 
-      // Vector velocidad tangente v(t) = r'(t) para inclinación dinámica sutil
       const velParamX = 4.5 * omegaX * Math.cos(omegaX * timestamp);
       const velParamY = s.amplitude * s.frequency * Math.cos(s.frequency * timestamp);
       const pitchFromVel = -velParamY * 45;
       const bankFromVel = velParamX * 140;
 
-      // Integración del sistema masa-resorte-amortiguador
       [s.currentRotX, s.velRotX] = stepSpring(s.currentRotX, s.velRotX, s.targetRotX, dt);
       [s.currentRotY, s.velRotY] = stepSpring(s.currentRotY, s.velRotY, s.targetRotY, dt);
       [s.currentTransX, s.velTransX] = stepSpring(s.currentTransX, s.velTransX, s.targetTransX, dt);
@@ -177,12 +177,10 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       const totalRotX = s.currentRotX + pitchFromVel;
       const totalRotY = s.currentRotY + bankFromVel;
 
-      // Aplicar transformación tridimensional al muñeco con aceleración por hardware
       if (dollRef.current) {
         dollRef.current.style.transform = `perspective(1000px) translate3d(${totalX.toFixed(1)}px, ${totalY.toFixed(1)}px, ${totalZ.toFixed(1)}px) rotateX(${totalRotX.toFixed(1)}deg) rotateY(${totalRotY.toFixed(1)}deg)`;
       }
 
-      // Sombra en el suelo interactiva
       if (shadowRef.current) {
         const shadowScale = Math.max(0.65, Math.min(1.2, 0.95 - totalY * 0.018));
         const shadowAlpha = Math.max(0.2, Math.min(0.6, 0.45 + totalY * 0.012));
@@ -191,68 +189,119 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       }
     };
 
-    stateRef.current.animFrameId = requestAnimationFrame(updatePhysics);
+    const syncLoop = () => {
+      if (canRun()) {
+        if (stateRef.current.animFrameId === null) {
+          lastDrawTime = 0;
+          stateRef.current.animFrameId = requestAnimationFrame(updatePhysics);
+        }
+      } else {
+        stopLoop();
+      }
+    };
+
+    const handleScroll = () => {
+      if (!isScrolling) {
+        isScrolling = true;
+        stopLoop();
+      }
+      if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
+      scrollTimeoutId = setTimeout(() => {
+        isScrolling = false;
+        refreshRect();
+        syncLoop();
+      }, 120);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    const handleVisibilityChange = () => {
+      isTabVisible = document.visibilityState === 'visible';
+      syncLoop();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    let observer;
+    try {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry) {
+            isVisible = entry.isIntersecting;
+            setIsActiveInView(entry.isIntersecting);
+            if (isVisible) refreshRect();
+            syncLoop();
+          }
+        },
+        { threshold: 0 }
+      );
+      if (containerRef.current) {
+        observer.observe(containerRef.current);
+      }
+    } catch (e) {
+      isVisible = true;
+    }
+
+    syncLoop();
 
     return () => {
       isRunning = false;
       window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
       if (observer) observer.disconnect();
-      if (stateRef.current.animFrameId) {
-        cancelAnimationFrame(stateRef.current.animFrameId);
-      }
+      if (resizeObserver) resizeObserver.disconnect();
+      stopLoop();
     };
   }, []);
 
-  // Manejo de eventos del mouse para cálculo de vectores
-  const handleMouseMove = (e) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+  // Cálculo de vectores usando el rect cacheado (cero forced reflows en mousemove)
+  const updateTargetFromPoint = (clientX, clientY) => {
+    const rect = rectRef.current || containerRef.current?.getBoundingClientRect();
+    if (!rect || !rect.width || !rect.height) return;
+    rectRef.current = rect;
 
-    // 1. Vector Origen O = (x0, y0) en el centro geométrico del contenedor
     const x0 = rect.left + rect.width / 2;
     const y0 = rect.top + rect.height / 2;
+    const Dx = clientX - x0;
+    const Dy = clientY - y0;
 
-    // 2. Vector Posición del Mouse P = (xm, ym)
-    const xm = e.clientX;
-    const ym = e.clientY;
-
-    // 3. Vector de Desplazamiento D = P - O
-    const Dx = xm - x0;
-    const Dy = ym - y0;
-
-    // Distancia Euclidiana ||D|| = sqrt(Dx^2 + Dy^2)
     const distance = Math.hypot(Dx, Dy);
     const maxRadius = Math.hypot(rect.width / 2, rect.height / 2);
-    const k = Math.min(1, distance / (maxRadius * 0.85)); // Factor de normalización
+    const k = Math.min(1, distance / (maxRadius * 0.85));
 
-    // Vector Unitario u = D / ||D||
     const ux = distance > 0.001 ? Dx / distance : 0;
     const uy = distance > 0.001 ? Dy / distance : 0;
 
-    // 4. Inclinación 3D y Parallax:
-    // - Inclinación en X = -uy * thetaMax
-    // - Inclinación en Y = ux * thetaMax
-    const thetaMax = 18; // Grados máximos de rotación
+    const thetaMax = 18;
     stateRef.current.targetRotX = -uy * k * thetaMax;
     stateRef.current.targetRotY = ux * k * thetaMax;
-    stateRef.current.targetTransX = ux * k * 26; // Parallax lateral (px)
-    stateRef.current.targetTransZ = (1 - k) * 35; // Profundidad Z (px)
+    stateRef.current.targetTransX = ux * k * 26;
+    stateRef.current.targetTransZ = (1 - k) * 35;
+  };
+
+  const handleMouseEnter = () => {
+    if (containerRef.current) {
+      rectRef.current = containerRef.current.getBoundingClientRect();
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseMove = (e) => {
+    updateTargetFromPoint(e.clientX, e.clientY);
   };
 
   const handleTouchMove = (e) => {
     if (!e.touches || !e.touches[0]) return;
-    setIsHovered(true);
-    handleMouseMove(e.touches[0]);
-  };
-
-  const handleTouchEnd = () => {
-    handleMouseLeave();
+    if (!isHovered) {
+      if (containerRef.current) {
+        rectRef.current = containerRef.current.getBoundingClientRect();
+      }
+      setIsHovered(true);
+    }
+    updateTargetFromPoint(e.touches[0].clientX, e.touches[0].clientY);
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    // Retorno suave a posición de equilibrio en levitación
     stateRef.current.targetRotX = 0;
     stateRef.current.targetRotY = 0;
     stateRef.current.targetTransX = 0;
@@ -270,15 +319,15 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onTouchEnd={handleMouseLeave}
+      onTouchCancel={handleMouseLeave}
       className="relative z-10 w-full min-h-[440px] sm:min-h-[520px] flex flex-col items-center justify-center select-none touch-pan-y overflow-x-clip"
       style={{ perspective: '1200px' }}
     >
-      {/* Luz volumétrica de fondo (Gradiente radial sin costo de Gaussian Blur en GPU móvil) */}
+      {/* Luz volumétrica de fondo (Gradiente radial sin costo de Gaussian Blur en GPU) */}
       <div
         className="absolute w-[300px] sm:w-[420px] h-[300px] sm:h-[420px] rounded-full pointer-events-none -z-10"
         style={{
@@ -295,39 +344,33 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
         }}
       />
 
-      {/* Muñeco interactivo en levitación con física vectorial */}
+      {/* Muñeco interactivo en levitación con física vectorial (nodo estable para rAF) */}
       <div
         onClick={() => onSelectProduct && onSelectProduct(activeProduct)}
         className="cursor-pointer group relative flex items-center justify-center p-2"
         title="Toca para inspeccionar pieza en el taller"
       >
-        <AnimatePresence initial={false} mode="wait">
-          <motion.div
+        <div
+          ref={dollRef}
+          className="flex items-center justify-center w-[290px] h-[290px] sm:w-[370px] sm:h-[370px] md:w-[420px] md:h-[420px] relative will-change-transform"
+          style={{
+            transformStyle: 'preserve-3d',
+            backfaceVisibility: 'hidden',
+          }}
+        >
+          <img
             key={activeProduct.id || currentIndex}
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.04 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="flex items-center justify-center w-[290px] h-[290px] sm:w-[370px] sm:h-[370px] md:w-[420px] md:h-[420px] relative"
-          >
-            <img
-              ref={dollRef}
-              src={activeImage}
-              alt={activeProduct.title}
-              decoding="async"
-              className="w-full h-full object-contain will-change-transform pointer-events-none select-none"
-              style={{
-                transformStyle: 'preserve-3d',
-                backfaceVisibility: 'hidden',
-              }}
-            />
-          </motion.div>
-        </AnimatePresence>
+            src={activeImage}
+            alt={activeProduct.title}
+            decoding="async"
+            className="w-full h-full object-contain pointer-events-none select-none transition-opacity duration-300"
+          />
+        </div>
 
-        {/* Insignia HUD Flotante Minimalista */}
-        <div className="absolute -bottom-2 sm:bottom-2 right-2 sm:right-6 z-20 bg-[#141313] sm:bg-[#141313]/95 border border-[#e0141f] px-3.5 py-2 sm:backdrop-blur-md shadow-[0_0_20px_rgba(224,20,31,0.35)] flex flex-col gap-0.5 group-hover:scale-105 transition-transform duration-300">
+        {/* Insignia HUD Flotante Minimalista (sin backdrop-blur ni animate-ping para proteger compositor Retina) */}
+        <div className="absolute -bottom-2 sm:bottom-2 right-2 sm:right-6 z-20 bg-[#141313]/95 border border-[#e0141f] px-3.5 py-2 shadow-[0_0_20px_rgba(224,20,31,0.35)] flex flex-col gap-0.5 group-hover:scale-105 transition-transform duration-300">
           <div className="flex items-center gap-1.5 text-[9px] font-mono text-[#ffb4ab] uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#e0141f] animate-ping" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#e0141f]" />
             <span translate="no">
               {activeProduct.technique === 'punto_cruz'
                 ? 'PUNTO CRUZ · GRÁFICO DMC'
@@ -358,7 +401,6 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
             <ChevronLeft className="w-4 h-4" />
           </button>
 
-          {/* Dots indicadores con área táctil ampliada (min-h-[44px]) */}
           <div className="flex items-center gap-1">
             {featuredProducts.map((p, idx) => (
               <button
@@ -397,4 +439,4 @@ export function AntiGravityHeroShowcase({ onSelectProduct }) {
       )}
     </div>
   );
-}
+});
